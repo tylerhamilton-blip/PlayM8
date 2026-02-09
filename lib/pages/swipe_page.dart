@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 
 import '../storage/local_store.dart';
 import '../types/models.dart';
+import '../services/igdb_service.dart';
 
 class SwipePage extends StatefulWidget {
   const SwipePage({super.key});
@@ -19,51 +20,18 @@ class _SwipePageState extends State<SwipePage> {
   List<String> _genres = [];
   String _activeGenre = 'All';
 
-  // Prevent showing already-swiped cards
   final Set<String> _swipedIds = {};
-
   SwipeGlow _glow = SwipeGlow.none;
 
-  // Brief overlay after swipe
   String? _flashText;
   IconData? _flashIcon;
   Color? _flashColor;
   Timer? _flashTimer;
 
-  // Placeholder “cover” URLs.
-  // Later we replace with IGDB real covers.
-  final List<GameCard> _allCards = [
-    GameCard(
-      id: '1',
-      title: 'Hades',
-      genre: 'Action',
-      imageUrl: 'https://placehold.co/600x800/png?text=Hades',
-    ),
-    GameCard(
-      id: '2',
-      title: 'Stardew Valley',
-      genre: 'Simulation',
-      imageUrl: 'https://placehold.co/600x800/png?text=Stardew+Valley',
-    ),
-    GameCard(
-      id: '3',
-      title: 'Celeste',
-      genre: 'Indie',
-      imageUrl: 'https://placehold.co/600x800/png?text=Celeste',
-    ),
-    GameCard(
-      id: '4',
-      title: 'Resident Evil 4',
-      genre: 'Horror',
-      imageUrl: 'https://placehold.co/600x800/png?text=Resident+Evil+4',
-    ),
-    GameCard(
-      id: '5',
-      title: 'Forza Horizon',
-      genre: 'Racing',
-      imageUrl: 'https://placehold.co/600x800/png?text=Forza+Horizon',
-    ),
-  ];
+  // IGDB-loaded cards
+  List<GameCard> _allCards = [];
+  bool _loading = true;
+  String? _error;
 
   @override
   void initState() {
@@ -78,13 +46,28 @@ class _SwipePageState extends State<SwipePage> {
   }
 
   Future<void> _bootstrap() async {
-    final selected = await LocalStore.loadSelectedGenres();
-    final history = await LocalStore.loadHistory();
-    setState(() {
-      _genres = selected;
-      _activeGenre = 'All';
-      _swipedIds.addAll(history.map((h) => h.card.id));
-    });
+    try {
+      final selected = await LocalStore.loadSelectedGenres();
+      final history = await LocalStore.loadHistory();
+      final fetched = await IgdbService.fetchGames(limit: 40);
+
+      setState(() {
+        _genres = selected;
+        _activeGenre = 'All';
+        _swipedIds.addAll(history.map((h) => h.card.id));
+
+        // NOTE: For now, genre is "Unknown" or whatever backend returns.
+        // We’ll hook real genre-based filtering next.
+        _allCards = fetched;
+        _loading = false;
+        _error = null;
+      });
+    } catch (e) {
+      setState(() {
+        _loading = false;
+        _error = e.toString();
+      });
+    }
   }
 
   List<GameCard> get _filteredCards {
@@ -92,7 +75,6 @@ class _SwipePageState extends State<SwipePage> {
         ? _allCards
         : _allCards.where((c) => c.genre == _activeGenre).toList();
 
-    // Remove already-swiped cards
     return base.where((c) => !_swipedIds.contains(c.id)).toList();
   }
 
@@ -195,33 +177,59 @@ class _SwipePageState extends State<SwipePage> {
         color: _glowColor,
         child: Stack(
           children: [
-            Padding(
-              padding: const EdgeInsets.all(16),
-              child: cards.isEmpty
-                  ? const Center(
-                child: Text(
-                  "No more games in this filter.\nTry changing genres!",
-                  textAlign: TextAlign.center,
+            if (_loading)
+              const Center(child: CircularProgressIndicator())
+            else if (_error != null)
+              Center(
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Text('Could not load IGDB games.'),
+                      const SizedBox(height: 10),
+                      Text(_error!, textAlign: TextAlign.center),
+                      const SizedBox(height: 14),
+                      FilledButton(
+                        onPressed: () {
+                          setState(() {
+                            _loading = true;
+                            _error = null;
+                          });
+                          _bootstrap();
+                        },
+                        child: const Text('Retry'),
+                      ),
+                    ],
+                  ),
                 ),
               )
-                  : CardSwiper(
-                controller: _controller,
-                cardsCount: cards.length,
-                onSwipe: (previousIndex, currentIndex, direction) async {
-                  final card = cards[previousIndex];
-                  await _handleSwipe(card, direction);
-                  return true;
-                },
-
-                // ✅ FIXED signature for your version:
-                cardBuilder: (context, index) {
-                  final c = cards[index];
-                  return GameCoverCard(card: c);
-                },
+            else
+              Padding(
+                padding: const EdgeInsets.all(16),
+                child: cards.isEmpty
+                    ? const Center(
+                  child: Text(
+                    "No more games to show.\nTry changing genres!",
+                    textAlign: TextAlign.center,
+                  ),
+                )
+                    : CardSwiper(
+                  controller: _controller,
+                  cardsCount: cards.length,
+                  onSwipe: (previousIndex, currentIndex, direction) async {
+                    final card = cards[previousIndex];
+                    await _handleSwipe(card, direction);
+                    return true;
+                  },
+                  // ✅ signature for your version:
+                  cardBuilder: (context, index) {
+                    final c = cards[index];
+                    return GameCoverCard(card: c);
+                  },
+                ),
               ),
-            ),
 
-            // Quick overlay after swipe
             if (_flashText != null && _flashIcon != null && _flashColor != null)
               Positioned(
                 top: 26,
@@ -273,7 +281,7 @@ class GameCoverCard extends StatelessWidget {
       child: Stack(
         fit: StackFit.expand,
         children: [
-          if (card.imageUrl != null)
+          if (card.imageUrl != null && card.imageUrl!.isNotEmpty)
             Image.network(
               card.imageUrl!,
               fit: BoxFit.cover,
