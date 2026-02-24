@@ -23,6 +23,10 @@ class _SwipePageState extends State<SwipePage> {
   final Set<String> _swipedIds = {};
   SwipeGlow _glow = SwipeGlow.none;
 
+  // ✅ NEW: drag tracking for progressive tint
+  Offset? _dragStart;
+  double _glowStrength = 0.0; // 0..1
+
   String? _flashText;
   IconData? _flashIcon;
   Color? _flashColor;
@@ -56,8 +60,6 @@ class _SwipePageState extends State<SwipePage> {
         _activeGenre = 'All';
         _swipedIds.addAll(history.map((h) => h.card.id));
 
-        // NOTE: For now, genre is "Unknown" or whatever backend returns.
-        // We’ll hook real genre-based filtering next.
         _allCards = fetched;
         _loading = false;
         _error = null;
@@ -78,17 +80,72 @@ class _SwipePageState extends State<SwipePage> {
     return base.where((c) => !_swipedIds.contains(c.id)).toList();
   }
 
+  // ✅ UPDATED: glow color uses strength (progress)
   Color? get _glowColor {
+    if (_glow == SwipeGlow.none || _glowStrength <= 0) return null;
+
+    // max opacity you want at "full swipe"
+    final maxOpacity = 0.35;
+    final o = (maxOpacity * _glowStrength).clamp(0.0, 0.40);
+
     switch (_glow) {
       case SwipeGlow.like:
-        return Colors.green.withOpacity(0.15);
+        return Colors.green.withOpacity(o);
       case SwipeGlow.maybe:
-        return Colors.yellow.withOpacity(0.15);
+        return Colors.yellow.withOpacity(o);
       case SwipeGlow.nope:
-        return Colors.red.withOpacity(0.15);
+        return Colors.red.withOpacity(o);
       case SwipeGlow.none:
         return null;
     }
+  }
+
+  // ✅ NEW: pointer listeners to estimate swipe direction + intensity
+  void _onPointerDown(PointerDownEvent e) {
+    _dragStart = e.position;
+    setState(() {
+      _glow = SwipeGlow.none;
+      _glowStrength = 0;
+    });
+  }
+
+  void _onPointerMove(PointerMoveEvent e) {
+    final start = _dragStart;
+    if (start == null) return;
+
+    final delta = e.position - start;
+    final dx = delta.dx;
+    final dy = delta.dy;
+
+    final ax = dx.abs();
+    final ay = dy.abs();
+
+    SwipeGlow nextGlow = SwipeGlow.none;
+
+    // Choose the dominant direction
+    if (ax > ay && ax > 2) {
+      nextGlow = dx > 0 ? SwipeGlow.like : SwipeGlow.nope;
+    } else if (ay > ax && ay > 2) {
+      // Only tint on upward movement (dy < 0)
+      nextGlow = dy < 0 ? SwipeGlow.maybe : SwipeGlow.none;
+    }
+
+    // Strength based on distance (tweak 180.0 to taste)
+    final dist = ax > ay ? ax : ay;
+    final strength = (dist / 180.0).clamp(0.0, 1.0);
+
+    setState(() {
+      _glow = nextGlow;
+      _glowStrength = strength;
+    });
+  }
+
+  void _onPointerEnd(PointerEvent e) {
+    _dragStart = null;
+    setState(() {
+      _glow = SwipeGlow.none;
+      _glowStrength = 0;
+    });
   }
 
   Future<void> _saveDecision(GameCard card, SwipeDecision decision) async {
@@ -119,24 +176,42 @@ class _SwipePageState extends State<SwipePage> {
   }
 
   Future<void> _handleSwipe(GameCard card, CardSwiperDirection direction) async {
+    // When a swipe is committed, show full-strength color briefly
     if (direction == CardSwiperDirection.right) {
-      setState(() => _glow = SwipeGlow.like);
+      setState(() {
+        _glow = SwipeGlow.like;
+        _glowStrength = 1.0;
+      });
       _flash(text: "LIKE", icon: Icons.thumb_up, color: Colors.green);
       await _saveDecision(card, SwipeDecision.like);
     } else if (direction == CardSwiperDirection.left) {
-      setState(() => _glow = SwipeGlow.nope);
+      setState(() {
+        _glow = SwipeGlow.nope;
+        _glowStrength = 1.0;
+      });
       _flash(text: "NOPE", icon: Icons.thumb_down, color: Colors.red);
       await _saveDecision(card, SwipeDecision.nope);
     } else if (direction == CardSwiperDirection.top) {
-      setState(() => _glow = SwipeGlow.maybe);
+      setState(() {
+        _glow = SwipeGlow.maybe;
+        _glowStrength = 1.0;
+      });
       _flash(text: "MAYBE", icon: Icons.help, color: Colors.amber);
       await _saveDecision(card, SwipeDecision.maybe);
     } else {
-      setState(() => _glow = SwipeGlow.none);
+      setState(() {
+        _glow = SwipeGlow.none;
+        _glowStrength = 0.0;
+      });
     }
 
     await Future<void>.delayed(const Duration(milliseconds: 220));
-    if (mounted) setState(() => _glow = SwipeGlow.none);
+    if (mounted) {
+      setState(() {
+        _glow = SwipeGlow.none;
+        _glowStrength = 0.0;
+      });
+    }
   }
 
   Future<void> _resetEverything() async {
@@ -173,7 +248,7 @@ class _SwipePageState extends State<SwipePage> {
         ],
       ),
       body: AnimatedContainer(
-        duration: const Duration(milliseconds: 150),
+        duration: const Duration(milliseconds: 120),
         color: _glowColor,
         child: Stack(
           children: [
@@ -214,19 +289,24 @@ class _SwipePageState extends State<SwipePage> {
                     textAlign: TextAlign.center,
                   ),
                 )
-                    : CardSwiper(
-                  controller: _controller,
-                  cardsCount: cards.length,
-                  onSwipe: (previousIndex, currentIndex, direction) async {
-                    final card = cards[previousIndex];
-                    await _handleSwipe(card, direction);
-                    return true;
-                  },
-                  // ✅ signature for your version:
-                  cardBuilder: (context, index) {
-                    final c = cards[index];
-                    return GameCoverCard(card: c);
-                  },
+                    : Listener(
+                  onPointerDown: _onPointerDown,
+                  onPointerMove: _onPointerMove,
+                  onPointerUp: _onPointerEnd,
+                  onPointerCancel: _onPointerEnd,
+                  child: CardSwiper(
+                    controller: _controller,
+                    cardsCount: cards.length,
+                    onSwipe: (previousIndex, currentIndex, direction) async {
+                      final card = cards[previousIndex];
+                      await _handleSwipe(card, direction);
+                      return true;
+                    },
+                    cardBuilder: (context, index) {
+                      final c = cards[index];
+                      return GameCoverCard(card: c);
+                    },
+                  ),
                 ),
               ),
 
@@ -237,7 +317,8 @@ class _SwipePageState extends State<SwipePage> {
                 right: 0,
                 child: Center(
                   child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 14, vertical: 10),
                     decoration: BoxDecoration(
                       color: _flashColor!.withOpacity(0.18),
                       borderRadius: BorderRadius.circular(999),
@@ -290,7 +371,8 @@ class GameCoverCard extends StatelessWidget {
                 return const Center(child: CircularProgressIndicator());
               },
               errorBuilder: (context, error, stack) {
-                return const Center(child: Icon(Icons.broken_image, size: 48));
+                return const Center(
+                    child: Icon(Icons.broken_image, size: 48));
               },
             )
           else
@@ -329,7 +411,8 @@ class GameCoverCard extends StatelessWidget {
                 ),
                 const SizedBox(height: 6),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 10, vertical: 6),
                   decoration: BoxDecoration(
                     color: Colors.white.withOpacity(0.12),
                     borderRadius: BorderRadius.circular(999),
