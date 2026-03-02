@@ -10,7 +10,6 @@ from supabase_auth.errors import AuthApiError
 class Account:
     #initializer for methods
     def __init__(self):
-        from user import User
         pass
 
     #Creates an account in supabase
