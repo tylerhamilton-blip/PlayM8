@@ -4,6 +4,7 @@ import 'package:hive_flutter/hive_flutter.dart';
 
 import 'pages/splash_page.dart';
 import 'pages/auth_page.dart';
+import 'pages/sign_up.dart';
 import 'pages/genre_questionnaire_page.dart';
 import 'pages/swipe_page.dart';
 import 'pages/history_page.dart';
@@ -28,6 +29,7 @@ class PlayM8App extends StatelessWidget {
       routes: [
         GoRoute(path: '/splash', builder: (_, __) => const SplashPage()),
         GoRoute(path: '/auth', builder: (_, __) => const AuthPage()),
+        GoRoute(path: '/signup',builder: (_, ___) => const SignupPage()),
         GoRoute(path: '/genres', builder: (_, __) => const GenreQuestionnairePage()),
         GoRoute(path: '/swipe', builder: (_, __) => const SwipePage()),
         GoRoute(path: '/history', builder: (_, __) => const HistoryPage()),
