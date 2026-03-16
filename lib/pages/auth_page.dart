@@ -26,7 +26,7 @@ class _AuthPageState extends State<AuthPage> {
     await LocalStore.setLoggedIn(true);
 
     if (!mounted) return;
-    context.go('/genres');
+    context.go('/signup');
 
     setState(() => _loading = false);
   }
