@@ -8,6 +8,8 @@ import 'pages/genre_questionnaire_page.dart';
 import 'pages/swipe_page.dart';
 import 'pages/history_page.dart';
 import 'storage/local_store.dart';
+import 'pages/sign_up.dart';
+
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -29,6 +31,7 @@ class PlayM8App extends StatelessWidget {
         GoRoute(path: '/splash', builder: (_, __) => const SplashPage()),
         GoRoute(path: '/auth', builder: (_, __) => const AuthPage()),
         GoRoute(path: '/genres', builder: (_, __) => const GenreQuestionnairePage()),
+        GoRoute(path: '/signup',builder: (_, ___) => const SignupPage()),
         GoRoute(path: '/swipe', builder: (_, __) => const SwipePage()),
         GoRoute(path: '/history', builder: (_, __) => const HistoryPage()),
       ],
