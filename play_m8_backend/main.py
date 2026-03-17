@@ -4,8 +4,16 @@ import requests
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
+from play_m8DB import supabase
+from account import Account
+from pydantic import BaseModel #Provides improved type hints, Data Validation, JSON serialization
 
 load_dotenv()
+
+class pyAccount (BaseModel):
+    email: str
+    password: str
+    username: str
 
 TWITCH_CLIENT_ID = os.getenv("TWITCH_CLIENT_ID", "")
 TWITCH_CLIENT_SECRET = os.getenv("TWITCH_CLIENT_SECRET", "")
@@ -19,6 +27,25 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+ac=Account() #Making an instance of the account class
+
+#Authentication section
+
+#DONT FORGET THIS IDEA!!!: save an instance of a class when there is a post request by putting
+#user class as none outside of the function (sign in) and make the instance inside so it saves
+"""
+This post method links to the signup page for the frontend(sign_up.dart). This will 
+make a new users and provide email confirmation for users to verification.
+"""
+@app.post("/signup")
+def signup(newAC: pyAccount):
+    email=newAC.email
+    username=newAC.username
+    password=newAC.password
+    ac.createAccount(username, email, password)
+    return {"Confirmation": "Look for a confirmation email in your account"}
+
+#Igdb
 _token_cache = {"access_token": None, "expires_at": 0}
 _games_cache = {"data": None, "expires_at": 0}
 
