@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import '../storage/local_store.dart';
-
+import './home_page.dart';
+import 'package:http/http.dart' as http;
+import 'dart:convert';
 class AuthPage extends StatefulWidget {
   const AuthPage({super.key});
 
@@ -12,10 +14,10 @@ class AuthPage extends StatefulWidget {
 class _AuthPageState extends State<AuthPage> {
   final _email = TextEditingController();
   final _password = TextEditingController();
-
+  final String apiUrl = "http://10.0.2.2:8000/login";//Xavion Changes
   bool _loading = false;
   String? _error;
-
+  
   Future<void> _mockSignUp() async {
     setState(() {
       _loading = true;
@@ -31,19 +33,41 @@ class _AuthPageState extends State<AuthPage> {
     setState(() => _loading = false);
   }
 
+  //New Change from Xavion
   Future<void> _mockSignIn() async {
     setState(() {
       _loading = true;
       _error = null;
     });
+    final Map<String, String> payload = {
+      "email": _email.text,
+      "password": _password.text,
+    };
 
-    await Future<void>.delayed(const Duration(milliseconds: 300));
-    await LocalStore.setLoggedIn(true);
-
-    if (!mounted) return;
-    context.go('/genres');
-
-    setState(() => _loading = false);
+    final response = await http.post(
+      Uri.parse(apiUrl),
+      headers: {"Content-Type": "application/json"},
+      body: jsonEncode(payload),
+    );
+    if (response.statusCode == 200) {
+      // Parse the JSON for success cases
+      await Future<void>.delayed(const Duration(milliseconds: 100));
+      await LocalStore.setLoggedIn(true);
+      final Map<String,dynamic>data= jsonDecode(response.body);
+      if (!mounted) return;
+      //The key to routing in my eyes or flipping pages
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(
+          builder:(_) => HomePage(username:data["username"]),
+        ),
+      );
+    setState(() => _loading=false);
+    } else {
+      setState(()=> _error = "Wrong password or email please try to login again");
+      throw Exception();
+    }
+    //End of Xavion changes
   }
 
   void _steamLogin() {
