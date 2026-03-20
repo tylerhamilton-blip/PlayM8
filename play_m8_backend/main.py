@@ -6,6 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
 from play_m8DB import supabase
 from account import Account
+from user import User #Just added for new changes
 from pydantic import BaseModel #Provides improved type hints, Data Validation, JSON serialization
 
 load_dotenv()
@@ -44,6 +45,15 @@ def signup(newAC: pyAccount):
     password=newAC.password
     ac.createAccount(username, email, password)
     return {"Confirmation": "Look for a confirmation email in your account"}
+    
+#New changes from Xavion
+@app.post("/login")
+def home(account: pyAccount):
+    email=account.email
+    password=account.password
+    user=ac.signIn(email,password)
+    username=user.getUsername()
+    return{"username":username}
 
 #Igdb
 _token_cache = {"access_token": None, "expires_at": 0}
