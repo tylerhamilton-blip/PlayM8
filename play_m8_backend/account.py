@@ -50,6 +50,7 @@ class Account:
         role=self.addRole()
         supabase.table("users").update({"lib": library, "role": role }).eq("userID",user).execute()
 
+#New changes from Xavion
     def signIn (self,email,password):
         from user import User
         #Throws an exception if there is no account to sign into
@@ -59,8 +60,7 @@ class Account:
                 {"email" : email,
                  "password" : password
                  })
-            username=supabase.table("users").select("username").eq("userID","7c11ee7c-30b8-4a4c-9a45-67d6557b0573").execute().data[0]["username"]
-            print("welcome great one")
+            username=supabase.rpc("getusername",params={'email': email}).execute().data
             #Will return a user to be used at the end for user function calls later
             return User(session.user.id,email,username)
         except AuthApiError as ae:
