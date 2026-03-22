@@ -60,7 +60,7 @@ class Account:
                 {"email" : email,
                  "password" : password
                  })
-            username=supabase.rpc("getusername",params={'email': email}).execute().data
+            username=supabase.table("users").select("username").eq("userID",session.user.id).execute().data[0]["username"]
             #Will return a user to be used at the end for user function calls later
             return User(session.user.id,email,username)
         except AuthApiError as ae:
