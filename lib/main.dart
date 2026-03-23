@@ -8,7 +8,6 @@ import 'pages/genre_questionnaire_page.dart';
 import 'pages/swipe_page.dart';
 import 'pages/history_page.dart';
 import 'storage/local_store.dart';
-import 'pages/sign_up.dart';
 
 
 Future<void> main() async {
