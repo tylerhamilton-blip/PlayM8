@@ -1,9 +1,10 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import '../storage/local_store.dart';
 import './home_page.dart';
 import 'package:http/http.dart' as http;
-import 'dart:convert';
+import './sign_up.dart';
 class AuthPage extends StatefulWidget {
   const AuthPage({super.key});
 
@@ -14,10 +15,11 @@ class AuthPage extends StatefulWidget {
 class _AuthPageState extends State<AuthPage> {
   final _email = TextEditingController();
   final _password = TextEditingController();
+
   final String apiUrl = "http://10.0.2.2:8000/login";//Xavion Changes
   bool _loading = false;
   String? _error;
-  
+
   Future<void> _mockSignUp() async {
     setState(() {
       _loading = true;
@@ -28,7 +30,12 @@ class _AuthPageState extends State<AuthPage> {
     await LocalStore.setLoggedIn(true);
 
     if (!mounted) return;
-    context.go('/signup');
+    //The key to routing in my eyes or flipping pages
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder:(_) => SignupPage()),
+    );
 
     setState(() => _loading = false);
   }
@@ -55,6 +62,7 @@ class _AuthPageState extends State<AuthPage> {
       await LocalStore.setLoggedIn(true);
       final Map<String,dynamic>data= jsonDecode(response.body);
       if (!mounted) return;
+      print(data["username"]);
       //The key to routing in my eyes or flipping pages
       Navigator.pushReplacement(
         context,
