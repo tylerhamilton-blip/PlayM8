@@ -31,7 +31,6 @@ class PlayM8App extends StatelessWidget {
         GoRoute(path: '/splash', builder: (_, __) => const SplashPage()),
         GoRoute(path: '/auth', builder: (_, __) => const AuthPage()),
         GoRoute(path: '/genres', builder: (_, __) => const GenreQuestionnairePage()),
-        GoRoute(path: '/signup',builder: (_, ___) => const SignupPage()),
         GoRoute(path: '/swipe', builder: (_, __) => const SwipePage()),
         GoRoute(path: '/history', builder: (_, __) => const HistoryPage()),
       ],
