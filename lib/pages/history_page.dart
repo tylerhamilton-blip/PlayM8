@@ -10,7 +10,11 @@ class HistoryPage extends StatefulWidget {
 }
 
 class _HistoryPageState extends State<HistoryPage> {
-  List<HistoryItem> _items = [];
+  bool _loading = true;
+  String? _error;
+
+  List<Map<String, dynamic>> _steamGames = [];
+  List<HistoryItem> _history = [];
 
   @override
   void initState() {
@@ -19,129 +23,319 @@ class _HistoryPageState extends State<HistoryPage> {
   }
 
   Future<void> _load() async {
-    final items = await LocalStore.loadHistory();
-    setState(() => _items = items.reversed.toList());
-  }
+    try {
+      final steamRaw = await LocalStore.loadSteamGames(); // List<dynamic>
+      final history = await LocalStore.loadHistory(); // List<HistoryItem>
 
-  Color _badgeColor(SwipeDecision d) {
-    switch (d) {
-      case SwipeDecision.like:
-        return Colors.green;
-      case SwipeDecision.maybe:
-        return Colors.amber;
-      case SwipeDecision.nope:
-        return Colors.red;
-    }
-  }
+      // Convert steam list items into Map<String, dynamic>
+      final steam = <Map<String, dynamic>>[];
+      for (final item in steamRaw) {
+        if (item is Map) {
+          steam.add(item.cast<String, dynamic>());
+        }
+      }
 
-  String _badgeText(SwipeDecision d) {
-    switch (d) {
-      case SwipeDecision.like:
-        return 'Liked';
-      case SwipeDecision.maybe:
-        return 'Maybe';
-      case SwipeDecision.nope:
-        return 'Nope';
+      // Sort by playtime_forever DESC (most played first)
+      steam.sort((a, b) {
+        final ap = (a['playtime_forever'] as int?) ?? 0;
+        final bp = (b['playtime_forever'] as int?) ?? 0;
+        return bp.compareTo(ap);
+      });
+
+      if (!mounted) return;
+      setState(() {
+        _steamGames = steam;
+        _history = history.reversed.toList(); // newest first
+        _loading = false;
+        _error = null;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _loading = false;
+        _error = e.toString();
+      });
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    if (_loading) {
+      return Scaffold(
+        appBar: AppBar(title: Text('History')),
+        body: Center(child: CircularProgressIndicator()),
+      );
+    }
+
+    if (_error != null) {
+      return Scaffold(
+        appBar: AppBar(title: const Text('History')),
+        body: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Text('Could not load history.'),
+                const SizedBox(height: 10),
+                Text(_error!, textAlign: TextAlign.center),
+                const SizedBox(height: 14),
+                FilledButton(onPressed: _load, child: const Text('Retry')),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+
+    final showSteam = _steamGames.isNotEmpty;
+    final showHistory = _history.isNotEmpty;
+
     return Scaffold(
       appBar: AppBar(title: const Text('History')),
-      body: _items.isEmpty
-          ? const Center(child: Text('No swipes yet.'))
-          : Padding(
-        padding: const EdgeInsets.all(12),
-        child: GridView.builder(
-          itemCount: _items.length,
-          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: 2,
-            mainAxisSpacing: 10,
-            crossAxisSpacing: 10,
-            childAspectRatio: 0.78,
+      body: (!showSteam && !showHistory)
+          ? const Center(child: Text('Nothing here yet. Swipe some games!'))
+          : CustomScrollView(
+        slivers: [
+          if (showSteam) ...[
+            const SliverToBoxAdapter(
+              child: Padding(
+                padding: EdgeInsets.fromLTRB(16, 16, 16, 10),
+                child: Text(
+                  'Most Played on Steam',
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
+                ),
+              ),
+            ),
+            SliverPadding(
+              padding: const EdgeInsets.symmetric(horizontal: 12),
+              sliver: SliverGrid(
+                delegate: SliverChildBuilderDelegate(
+                      (context, index) {
+                    final g = _steamGames[index];
+                    return SteamGameTile(game: g);
+                  },
+                  childCount: _steamGames.length,
+                ),
+                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: 2,
+                  mainAxisSpacing: 12,
+                  crossAxisSpacing: 12,
+                  childAspectRatio: 1.55,
+                ),
+              ),
+            ),
+            const SliverToBoxAdapter(child: SizedBox(height: 18)),
+          ],
+          if (showHistory) ...[
+            const SliverToBoxAdapter(
+              child: Padding(
+                padding: EdgeInsets.fromLTRB(16, 6, 16, 10),
+                child: Text(
+                  'Swiped Games',
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
+                ),
+              ),
+            ),
+            SliverPadding(
+              padding: const EdgeInsets.fromLTRB(12, 0, 12, 18),
+              sliver: SliverGrid(
+                delegate: SliverChildBuilderDelegate(
+                      (context, index) {
+                    final item = _history[index];
+                    return SwipedGameTile(item: item);
+                  },
+                  childCount: _history.length,
+                ),
+                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: 2,
+                  mainAxisSpacing: 12,
+                  crossAxisSpacing: 12,
+                  childAspectRatio: 0.78,
+                ),
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class SteamGameTile extends StatelessWidget {
+  final Map<String, dynamic> game;
+  const SteamGameTile({super.key, required this.game});
+
+  @override
+  Widget build(BuildContext context) {
+    final name = (game['name'] ?? 'Unknown') as String;
+    final header = (game['header_image'] ?? '') as String;
+    final minutes = (game['playtime_forever'] as int?) ?? 0;
+    final hours = (minutes / 60).toStringAsFixed(1);
+
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(14),
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
+          if (header.isNotEmpty)
+            Image.network(
+              header,
+              fit: BoxFit.cover,
+              errorBuilder: (_, __, ___) => const DecoratedBox(
+                decoration: BoxDecoration(color: Colors.black12),
+                child: Center(child: Icon(Icons.broken_image)),
+              ),
+            )
+          else
+            const DecoratedBox(
+              decoration: BoxDecoration(color: Colors.black12),
+              child: Center(child: Icon(Icons.videogame_asset)),
+            ),
+          Align(
+            alignment: Alignment.bottomCenter,
+            child: Container(
+              height: 70,
+              decoration: const BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [Colors.transparent, Color(0xCC000000)],
+                ),
+              ),
+            ),
           ),
-          itemBuilder: (context, i) {
-            final item = _items[i];
-            final badgeColor = _badgeColor(item.decision);
-
-            return Card(
-              clipBehavior: Clip.antiAlias,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(16),
-              ),
-              child: Stack(
-                fit: StackFit.expand,
-                children: [
-                  if (item.card.imageUrl != null)
-                    Image.network(
-                      item.card.imageUrl!,
-                      fit: BoxFit.cover,
-                      errorBuilder: (_, __, ___) => const Center(
-                        child: Icon(Icons.broken_image),
-                      ),
-                    )
-                  else
-                    const Center(child: Icon(Icons.sports_esports, size: 48)),
-
-                  Align(
-                    alignment: Alignment.bottomCenter,
-                    child: Container(
-                      height: 90,
-                      decoration: const BoxDecoration(
-                        gradient: LinearGradient(
-                          begin: Alignment.topCenter,
-                          end: Alignment.bottomCenter,
-                          colors: [Colors.transparent, Color(0xCC000000)],
-                        ),
-                      ),
-                    ),
+          Positioned(
+            left: 10,
+            right: 10,
+            bottom: 10,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  name,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w800,
                   ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  '$hours hrs played',
+                  style: const TextStyle(color: Colors.white70, fontSize: 12),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
 
-                  Positioned(
-                    left: 10,
-                    right: 10,
-                    bottom: 10,
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          item.card.title,
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontWeight: FontWeight.w800,
-                            fontSize: 16,
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        Align(
-                          alignment: Alignment.bottomRight,
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                            decoration: BoxDecoration(
-                              color: badgeColor.withOpacity(0.20),
-                              borderRadius: BorderRadius.circular(999),
-                              border: Border.all(color: badgeColor, width: 1.5),
-                            ),
-                            child: Text(
-                              _badgeText(item.decision),
-                              style: TextStyle(
-                                color: badgeColor,
-                                fontWeight: FontWeight.w700,
-                              ),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
+class SwipedGameTile extends StatelessWidget {
+  final HistoryItem item;
+  const SwipedGameTile({super.key, required this.item});
+
+  @override
+  Widget build(BuildContext context) {
+    final card = item.card;
+
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(14),
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
+          if ((card.imageUrl ?? '').isNotEmpty)
+            Image.network(
+              card.imageUrl!,
+              fit: BoxFit.cover,
+              errorBuilder: (_, __, ___) => const DecoratedBox(
+                decoration: BoxDecoration(color: Colors.black12),
+                child: Center(child: Icon(Icons.broken_image)),
               ),
-            );
-          },
-        ),
+            )
+          else
+            const DecoratedBox(
+              decoration: BoxDecoration(color: Colors.black12),
+              child: Center(child: Icon(Icons.sports_esports)),
+            ),
+          Align(
+            alignment: Alignment.bottomCenter,
+            child: Container(
+              height: 80,
+              decoration: const BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [Colors.transparent, Color(0xCC000000)],
+                ),
+              ),
+            ),
+          ),
+          Positioned(
+            left: 10,
+            right: 10,
+            bottom: 10,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  card.title,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                _DecisionPill(decision: item.decision),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _DecisionPill extends StatelessWidget {
+  final SwipeDecision decision;
+  const _DecisionPill({required this.decision});
+
+  @override
+  Widget build(BuildContext context) {
+    late final String text;
+    late final Color color;
+
+    switch (decision) {
+      case SwipeDecision.like:
+        text = 'Liked';
+        color = Colors.green;
+        break;
+      case SwipeDecision.nope:
+        text = 'Nope';
+        color = Colors.red;
+        break;
+      case SwipeDecision.maybe:
+        text = 'Maybe';
+        color = Colors.amber;
+        break;
+    }
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.20),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: color.withOpacity(0.7)),
+      ),
+      child: Text(
+        text,
+        style: TextStyle(color: color, fontWeight: FontWeight.w700, fontSize: 12),
       ),
     );
   }
