@@ -43,7 +43,6 @@ class _AuthPageState extends State<AuthPage> {
     setState(() => _loading = false);
   }
 
-  // Email login -> teammate’s backend + HomePage navigation
   Future<void> _mockSignIn() async {
     setState(() {
       _loading = true;
@@ -93,7 +92,7 @@ class _AuthPageState extends State<AuthPage> {
     }
   }
 
-  // ✅ Steam login -> deep link -> main.dart routes to /swipe
+  //Steam login -> deep link -> main.dart routes to /swipe
   Future<void> _steamLogin() async {
     setState(() {
       _loading = true;
@@ -126,8 +125,8 @@ class _AuthPageState extends State<AuthPage> {
         throw Exception('Could not open Steam login URL.');
       }
 
-      // ✅ DO NOT navigate here.
-      // Steam callback deep-links into app -> main.dart handles it -> /swipe
+      //DO NOT navigate here.
+      //Steam callback deep-links into app -> main.dart handles it -> /swipe
     } catch (e) {
       if (!mounted) return;
       setState(() {
