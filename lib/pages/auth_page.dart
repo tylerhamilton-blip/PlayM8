@@ -1,10 +1,12 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
-import 'package:go_router/go_router.dart';
+import 'package:http/http.dart' as http;
+import 'package:url_launcher/url_launcher.dart';
+
 import '../storage/local_store.dart';
 import './home_page.dart';
-import 'package:http/http.dart' as http;
 import './sign_up.dart';
+
 class AuthPage extends StatefulWidget {
   const AuthPage({super.key});
 
@@ -16,72 +18,132 @@ class _AuthPageState extends State<AuthPage> {
   final _email = TextEditingController();
   final _password = TextEditingController();
 
-  final String apiUrl = "http://10.0.2.2:8000/login";//Xavion Changes
   bool _loading = false;
   String? _error;
 
+  static const String _baseUrl = 'http://10.0.2.2:8000';
+  static const String _loginUrl = '$_baseUrl/login';
+
+  // Sign up -> teammate’s flow
   Future<void> _mockSignUp() async {
     setState(() {
       _loading = true;
       _error = null;
     });
 
-    await Future<void>.delayed(const Duration(milliseconds: 400));
+    await Future<void>.delayed(const Duration(milliseconds: 150));
     await LocalStore.setLoggedIn(true);
 
     if (!mounted) return;
-    //The key to routing in my eyes or flipping pages
     Navigator.push(
       context,
-      MaterialPageRoute(
-        builder:(_) => SignupPage()),
+      MaterialPageRoute(builder: (_) => const SignupPage()),
     );
 
     setState(() => _loading = false);
   }
 
-  //New Change from Xavion
+  // Email login -> teammate’s backend + HomePage navigation
   Future<void> _mockSignIn() async {
     setState(() {
       _loading = true;
       _error = null;
     });
-    final Map<String, String> payload = {
-      "email": _email.text,
-      "password": _password.text,
-    };
 
-    final response = await http.post(
-      Uri.parse(apiUrl),
-      headers: {"Content-Type": "application/json"},
-      body: jsonEncode(payload),
-    );
-    if (response.statusCode == 200) {
-      // Parse the JSON for success cases
-      await Future<void>.delayed(const Duration(milliseconds: 100));
+    try {
+      final payload = <String, dynamic>{
+        "email": _email.text.trim(),
+        "password": _password.text,
+        "username": "", // backend model includes it; safe to send empty
+      };
+
+      final response = await http
+          .post(
+            Uri.parse(_loginUrl),
+            headers: {"Content-Type": "application/json"},
+            body: jsonEncode(payload),
+          )
+          .timeout(const Duration(seconds: 20));
+
+      if (response.statusCode != 200) {
+        setState(() {
+          _error = "Wrong password or email. Please try again.";
+        });
+        return;
+      }
+
+      final data = jsonDecode(response.body) as Map<String, dynamic>;
+      final username = (data["username"] ?? "").toString();
+
       await LocalStore.setLoggedIn(true);
-      final Map<String,dynamic>data= jsonDecode(response.body);
+
       if (!mounted) return;
-      print(data["username"]);
-      //The key to routing in my eyes or flipping pages
       Navigator.pushReplacement(
         context,
-        MaterialPageRoute(
-          builder:(_) => HomePage(username:data["username"]),
-        ),
+        MaterialPageRoute(builder: (_) => HomePage(username: username)),
       );
-    setState(() => _loading=false);
-    } else {
-      setState(()=> _error = "Wrong password or email please try to login again");
-      throw Exception();
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _error = "Login failed: $e";
+      });
+    } finally {
+      if (!mounted) return;
+      setState(() => _loading = false);
     }
-    //End of Xavion changes
   }
 
-  void _steamLogin() {
+  // ✅ Steam login -> deep link -> main.dart routes to /swipe
+  Future<void> _steamLogin() async {
     setState(() {
-      _error = 'Steam login is Phase 2 (requires a backend).';
+      _loading = true;
+      _error = null;
     });
+
+    try {
+      final uri = Uri.parse('$_baseUrl/steam/login_url');
+      final resp = await http.get(uri).timeout(const Duration(seconds: 20));
+
+      if (resp.statusCode != 200) {
+        throw Exception('Backend ${resp.statusCode}: ${resp.body}');
+      }
+
+      final data = jsonDecode(resp.body) as Map<String, dynamic>;
+      final url = (data['url'] ?? '').toString();
+
+      if (url.isEmpty) {
+        throw Exception('Backend did not return a login url.');
+      }
+
+      final steamUri = Uri.parse(url);
+
+      final ok = await launchUrl(
+        steamUri,
+        mode: LaunchMode.externalApplication,
+      );
+
+      if (!ok) {
+        throw Exception('Could not open Steam login URL.');
+      }
+
+      // ✅ DO NOT navigate here.
+      // Steam callback deep-links into app -> main.dart handles it -> /swipe
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _error = 'Steam login failed: $e';
+      });
+    } finally {
+      if (!mounted) return;
+      setState(() => _loading = false);
+    }
+  }
+
+  @override
+  void dispose() {
+    _email.dispose();
+    _password.dispose();
+    super.dispose();
   }
 
   @override
@@ -115,7 +177,13 @@ class _AuthPageState extends State<AuthPage> {
                 Expanded(
                   child: FilledButton(
                     onPressed: _loading ? null : _mockSignIn,
-                    child: const Text('Login'),
+                    child: _loading
+                        ? const SizedBox(
+                            height: 18,
+                            width: 18,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Text('Login'),
                   ),
                 ),
                 const SizedBox(width: 10),
