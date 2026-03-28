@@ -7,25 +7,34 @@ class GameCard {
   final String? imageUrl;
   final String genre;
 
+  //NEW: platforms / consoles from IGDB
+  final List<String> platforms;
+
   GameCard({
     required this.id,
     required this.title,
     required this.imageUrl,
     required this.genre,
-  });
+    List<String>? platforms,
+  }) : platforms = platforms ?? const [];
 
   Map<String, dynamic> toJson() => {
     'id': id,
     'title': title,
     'imageUrl': imageUrl,
     'genre': genre,
+    'platforms': platforms,
   };
 
   static GameCard fromJson(Map<String, dynamic> json) => GameCard(
-    id: json['id'] as String,
-    title: json['title'] as String,
+    id: (json['id']).toString(),
+    title: (json['title'] ?? 'Unknown') as String,
     imageUrl: json['imageUrl'] as String?,
-    genre: json['genre'] as String,
+    genre: (json['genre'] ?? 'Unknown') as String,
+    platforms: (json['platforms'] as List?)
+        ?.map((e) => e.toString())
+        .toList() ??
+        const [],
   );
 }
 
