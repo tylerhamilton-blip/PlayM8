@@ -11,10 +11,10 @@ from fastapi.responses import HTMLResponse
 from dotenv import load_dotenv
 from pydantic import BaseModel
 
-from play_m8DB import supabase  # kept (even if not used yet)
+from play_m8DB import supabase
 from account import Account
 
-# Friend-added: user model (safe import so app doesn't crash if file missing)
+#User model (safe import so app doesn't crash if file missing)
 try:
     from user import User  # noqa: F401
 except Exception:
@@ -65,8 +65,6 @@ def signup(newAC: pyAccount):
     ac.createAccount(newAC.username, newAC.email, newAC.password)
     return {"Confirmation": "Look for a confirmation email in your account"}
 
-
-# ✅ Friend-added endpoint (kept)
 @app.post("/login")
 def login(account: pyAccount):
     """
