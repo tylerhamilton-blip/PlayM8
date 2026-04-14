@@ -222,6 +222,27 @@ def steam_owned_games(steamid: str):
 
     return {"steamid": steamid, "game_count": len(cleaned), "games": cleaned}
 
+@app.get("/steam/vids")
+def steam_video(gameName:str):
+    #Used to get the id of from a game name
+    url=f"https://store.steampowered.com/api/storesearch/?term={gameName}&l=english&cc=US"
+    response= requests.get(url).json()
+    #Getting the necessary ID
+    id=response["items"][0]["id"]
+    #Getting the trailer set in steam for the game
+    url=f"https://store.steampowered.com/api/appdetails?appids={id}"
+    response=requests.get(url).json()
+    if response[str(id)]["data"].get("movies")==None:
+        return {"Error": "No video available for game"}
+    else:
+        if response[str(id)]["data"]["movies"][0].get("mp4")==None:
+            data=response[str(id)]["data"]["movies"][0].get("hls_h264")
+            print(data)
+            return {"HLS":data,"name": gameName}
+        else:
+            data=response[str(id)]["data"]["movies"][0].get("mp4")
+            return {"MP4":data, "name":gameName}
+
 
 # ==========================================================
 # IGDB + Twitch token
