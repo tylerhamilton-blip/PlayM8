@@ -1,6 +1,12 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:play_m8/pages/GamePage.dart';
 import '../storage/local_store.dart';
 import '../types/models.dart';
+import 'package:http/http.dart' as http;
+
+//New
+final _baseUrl= 'http://10.0.2.2:8000';
 
 class HistoryPage extends StatefulWidget {
   const HistoryPage({super.key});
@@ -162,6 +168,28 @@ class _HistoryPageState extends State<HistoryPage> {
   }
 }
 
+//New
+Future<String> getVideo(String gameName) async{
+  final url= Uri.parse('$_baseUrl/steam/vids?gameName=$gameName');
+  final response= await http.get(url).timeout(const Duration(seconds: 25));
+  if (response.statusCode != 200) {
+    throw Exception('Steam login_url failed: ${response.body}');
+  }
+  final data= jsonDecode(response.body) as Map <String, dynamic>;
+  if (data.containsKey("HLS")) {
+    print(data["HLS"]);
+    return data["HLS"] as String;
+  }
+  else if (data.containsKey("MP4")){
+    print(data["MP4"]);
+    return data["MP4"] as String;
+  }
+  else{
+    print(data["Error"]);
+    return data["Error"] as String;
+  }
+}
+
 class SteamGameTile extends StatelessWidget {
   final Map<String, dynamic> game;
   const SteamGameTile({super.key, required this.game});
@@ -172,64 +200,79 @@ class SteamGameTile extends StatelessWidget {
     final header = (game['header_image'] ?? '') as String;
     final minutes = (game['playtime_forever'] as int?) ?? 0;
     final hours = (minutes / 60).toStringAsFixed(1);
-
+    String link;//New
+    
+    //New 
     return ClipRRect(
       borderRadius: BorderRadius.circular(14),
-      child: Stack(
-        fit: StackFit.expand,
-        children: [
-          if (header.isNotEmpty)
-            Image.network(
-              header,
-              fit: BoxFit.cover,
-              errorBuilder: (_, __, ___) => const DecoratedBox(
-                decoration: BoxDecoration(color: Colors.black12),
-                child: Center(child: Icon(Icons.broken_image)),
-              ),
-            )
-          else
-            const DecoratedBox(
-              decoration: BoxDecoration(color: Colors.black12),
-              child: Center(child: Icon(Icons.videogame_asset)),
-            ),
-          Align(
-            alignment: Alignment.bottomCenter,
-            child: Container(
-              height: 70,
-              decoration: const BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                  colors: [Colors.transparent, Color(0xCC000000)],
+      child: Material(
+        child: InkWell(
+          onTap: () async {
+            link=await getVideo(name);
+            if(link.startsWith("https")) {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => Gamepage(videoUrl: link,gameName: name)),
+              );
+            }
+          },
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              if (header.isNotEmpty)
+                Image.network(
+                  header,
+                  fit: BoxFit.cover,
+                  errorBuilder: (_, __, ___) => const DecoratedBox(
+                    decoration: BoxDecoration(color: Colors.black12),
+                    child: Center(child: Icon(Icons.broken_image)),
+                  ),
+                )
+              else
+                const DecoratedBox(
+                  decoration: BoxDecoration(color: Colors.black12),
+                  child: Center(child: Icon(Icons.videogame_asset)),
                 ),
-              ),
-            ),
-          ),
-          Positioned(
-            left: 10,
-            right: 10,
-            bottom: 10,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  name,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.w800,
+              Align(
+                alignment: Alignment.bottomCenter,
+                child: Container(
+                  height: 70,
+                  decoration: const BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                      colors: [Colors.transparent, Color(0xCC000000)],
+                    ),
                   ),
                 ),
-                const SizedBox(height: 4),
-                Text(
-                  '$hours hrs played',
-                  style: const TextStyle(color: Colors.white70, fontSize: 12),
+              ),
+              Positioned(
+                left: 10,
+                right: 10,
+                bottom: 10,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      name,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      '$hours hrs played',
+                      style: const TextStyle(color: Colors.white70, fontSize: 12),
+                    ),
+                  ],
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }
