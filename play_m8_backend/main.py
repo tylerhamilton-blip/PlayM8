@@ -303,8 +303,9 @@ def _igdb_best_match_categories(game_name: str) -> Tuple[List[str], List[str]]:
     token = get_twitch_token()
     headers = {"Client-ID": TWITCH_CLIENT_ID, "Authorization": f"Bearer {token}"}
 
+    search=q.replace('"', '\\"')
     query = f'''
-      search "{q.replace('"', '\\"')}";
+      search "{search}";
       fields id, name, genres.name, themes.name, rating_count;
       where name != null;
       limit 5;
