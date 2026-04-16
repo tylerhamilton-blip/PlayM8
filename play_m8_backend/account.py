@@ -47,8 +47,7 @@ class Account:
     def addUser(self,user, username):
         supabase.table("users").insert({"userID": user, "username": username}).execute()
         library=self.addLibrary(user)
-        role=self.addRole()
-        supabase.table("users").update({"lib": library, "role": role }).eq("userID",user).execute()
+        supabase.table("users").update({"lib": library}).eq("userID",user).execute()
 
 #New changes from Xavion
     def signIn (self,email,password):
