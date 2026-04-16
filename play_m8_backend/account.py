@@ -14,9 +14,6 @@ class Account:
 
     #Creates an account in supabase
     def createAccount(self,username,email,password):
-        #validate_password(password) Function for sql injection prevention
-        #validate_email(email) Function for sql injection prevention
-        #validate_username(username) Function for sql injection prevention
         response = supabase.auth.sign_up(
             {"email" : email,
              "password" : password
