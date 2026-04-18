@@ -1,4 +1,5 @@
 import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_card_swiper/flutter_card_swiper.dart';
 import 'package:go_router/go_router.dart';
@@ -18,7 +19,7 @@ class _SwipePageState extends State<SwipePage> {
   List<String> _genres = [];
   String _activeGenre = 'All';
 
-  // ✅ platform filter state
+  //platform filter state
   List<String> _allPlatforms = []; // from IGDB
   Set<String> _selectedPlatforms = {}; // user’s selection
 
@@ -34,13 +35,14 @@ class _SwipePageState extends State<SwipePage> {
   Color? _flashColor;
   Timer? _flashTimer;
 
-  // IGDB-loaded cards (already filtered by genre (and optionally platforms) SERVER-SIDE)
-  List<GameCard> _allCards = [];
-  bool _loading = true; // ✅ only for initial load / full error screen
-  bool _refreshing = false; // ✅ for genre/console changes (overlay, does NOT unmount swiper)
+  //swipe “deck” that shrinks as you swipe
+  List<GameCard> _deck = [];
+
+  bool _loading = true; // initial load
+  bool _refreshing = false; // filter change overlay
   String? _error;
 
-  // ✅ NEW: show Steam import popup only once per page instance
+  //show Steam import popup only once per page instance
   bool _didShowSteamImportDialog = false;
 
   @override
@@ -55,7 +57,7 @@ class _SwipePageState extends State<SwipePage> {
     super.dispose();
   }
 
-  // ✅ NEW: shows popup if we arrived from Steam link with extra data
+  //shows popup if we arrived from Steam link with extra data
   void _maybeShowSteamImportDialog() {
     if (_didShowSteamImportDialog) return;
 
@@ -67,7 +69,10 @@ class _SwipePageState extends State<SwipePage> {
 
     final imported = extra['importedGenres'];
     final importedGenres = (imported is List)
-        ? imported.map((e) => e.toString()).where((s) => s.trim().isNotEmpty).toList()
+        ? imported
+        .map((e) => e.toString())
+        .where((s) => s.trim().isNotEmpty)
+        .toList()
         : <String>[];
 
     _didShowSteamImportDialog = true;
@@ -91,19 +96,13 @@ class _SwipePageState extends State<SwipePage> {
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text(
-                    'Linking was successful! Imported genres/themes:',
-                  ),
+                  const Text('Linking was successful! Imported genres/themes:'),
                   const SizedBox(height: 10),
                   Wrap(
                     spacing: 8,
                     runSpacing: 8,
                     children: importedGenres
-                        .map(
-                          (g) => Chip(
-                        label: Text(g),
-                      ),
-                    )
+                        .map((g) => Chip(label: Text(g)))
                         .toList(),
                   ),
                 ],
@@ -125,32 +124,30 @@ class _SwipePageState extends State<SwipePage> {
     try {
       final selectedGenres = await LocalStore.loadSelectedGenres();
       final history = await LocalStore.loadHistory();
-
-      // ✅ load saved platform selection
       final savedPlatforms = await LocalStore.loadSelectedPlatforms();
 
-      // ✅ fetch platforms list for the selector UI
       final platforms = await IgdbService.fetchPlatforms(limit: 250);
 
-      // ✅ pick a starting genre:
-      // If user selected genres, default to first one; otherwise "All"
       final startGenre = selectedGenres.isNotEmpty ? selectedGenres.first : 'All';
 
       if (!mounted) return;
       setState(() {
         _genres = selectedGenres;
         _activeGenre = startGenre;
-        _swipedIds.addAll(history.map((h) => h.card.id));
+
+        _swipedIds
+          ..clear()
+          ..addAll(history.map((h) => h.card.id));
 
         _allPlatforms = platforms;
         _selectedPlatforms = savedPlatforms.toSet();
 
-        _loading = false; // we’ll show refreshing overlay while fetching first batch
+        _loading = false;
         _refreshing = true;
         _error = null;
       });
 
-      await _refetchGames(); // ✅ initial fetch uses genre + consoles
+      await _refetchGames();
     } catch (e) {
       if (!mounted) return;
       setState(() {
@@ -161,24 +158,25 @@ class _SwipePageState extends State<SwipePage> {
     }
   }
 
-  // ✅ Always fetch from backend by GENRE (and optional platforms)
   Future<void> _refetchGames() async {
     try {
       final fetched = await IgdbService.fetchGames(
         limit: 40,
-        genre: _activeGenre, // ✅ primary filter
-        platforms: _selectedPlatforms.toList(), // ✅ optional console filter
+        genre: _activeGenre,
+        platforms: _selectedPlatforms.toList(),
       );
+
+      // Remove anything already swiped (from history)
+      final deck = fetched.where((c) => !_swipedIds.contains(c.id)).toList();
 
       if (!mounted) return;
       setState(() {
-        _allCards = fetched;
+        _deck = deck;
         _refreshing = false;
         _error = null;
 
-        // reset glow state
         _glow = SwipeGlow.none;
-        _glowStrength = 0;
+        _glowStrength = 0.0;
       });
     } catch (e) {
       if (!mounted) return;
@@ -187,11 +185,6 @@ class _SwipePageState extends State<SwipePage> {
         _error = e.toString();
       });
     }
-  }
-
-  // ✅ Now filtering is ONLY: not swiped (genre+platform already done server-side)
-  List<GameCard> get _filteredCards {
-    return _allCards.where((c) => !_swipedIds.contains(c.id)).toList();
   }
 
   Color? get _glowColor {
@@ -212,13 +205,11 @@ class _SwipePageState extends State<SwipePage> {
     }
   }
 
+  //no setState on pointer down (prevents gesture lock on desktop/emulator)
   void _onPointerDown(PointerDownEvent e) {
     _dragStart = e.position;
-    if (!mounted) return;
-    setState(() {
-      _glow = SwipeGlow.none;
-      _glowStrength = 0;
-    });
+    _glow = SwipeGlow.none;
+    _glowStrength = 0.0;
   }
 
   void _onPointerMove(PointerMoveEvent e) {
@@ -241,26 +232,27 @@ class _SwipePageState extends State<SwipePage> {
     }
 
     final dist = ax > ay ? ax : ay;
-    final strength = (dist / 180.0).clamp(0.0, 1.0);
+    final nextStrength = (dist / 180.0).clamp(0.0, 1.0);
+    
+    final changed =
+        nextGlow != _glow || (nextStrength - _glowStrength).abs() > 0.02;
+    if (!changed) return;
 
     setState(() {
       _glow = nextGlow;
-      _glowStrength = strength;
+      _glowStrength = nextStrength;
     });
   }
 
   void _onPointerEnd(PointerEvent e) {
     _dragStart = null;
     if (!mounted) return;
+    if (_glow == SwipeGlow.none && _glowStrength == 0.0) return;
+
     setState(() {
       _glow = SwipeGlow.none;
-      _glowStrength = 0;
+      _glowStrength = 0.0;
     });
-  }
-
-  Future<void> _saveDecision(GameCard card, SwipeDecision decision) async {
-    _swipedIds.add(card.id);
-    await LocalStore.addHistory(card, decision);
   }
 
   void _flash({
@@ -287,43 +279,47 @@ class _SwipePageState extends State<SwipePage> {
     });
   }
 
-  Future<void> _handleSwipe(GameCard card, CardSwiperDirection direction) async {
-    if (!mounted) return;
+  Future<void> _saveDecision(GameCard card, SwipeDecision decision) async {
+    _swipedIds.add(card.id);
+    await LocalStore.addHistory(card, decision);
+  }
 
-    if (direction == CardSwiperDirection.right) {
-      setState(() {
-        _glow = SwipeGlow.like;
-        _glowStrength = 1.0;
-      });
-      _flash(text: "LIKE", icon: Icons.thumb_up, color: Colors.green);
-      await _saveDecision(card, SwipeDecision.like);
-    } else if (direction == CardSwiperDirection.left) {
-      setState(() {
-        _glow = SwipeGlow.nope;
-        _glowStrength = 1.0;
-      });
-      _flash(text: "NOPE", icon: Icons.thumb_down, color: Colors.red);
-      await _saveDecision(card, SwipeDecision.nope);
-    } else if (direction == CardSwiperDirection.top) {
-      setState(() {
-        _glow = SwipeGlow.maybe;
-        _glowStrength = 1.0;
-      });
-      _flash(text: "MAYBE", icon: Icons.help, color: Colors.amber);
-      await _saveDecision(card, SwipeDecision.maybe);
-    } else {
+  //Fire-and-forget commit (doesn’t await in onSwipe for 4.1.3)
+  void _commitSwipe(GameCard card, CardSwiperDirection direction) {
+    Future.microtask(() async {
+      if (!mounted) return;
+
+      if (direction == CardSwiperDirection.right) {
+        setState(() {
+          _glow = SwipeGlow.like;
+          _glowStrength = 1.0;
+        });
+        _flash(text: "LIKE", icon: Icons.thumb_up, color: Colors.green);
+        await _saveDecision(card, SwipeDecision.like);
+      } else if (direction == CardSwiperDirection.left) {
+        setState(() {
+          _glow = SwipeGlow.nope;
+          _glowStrength = 1.0;
+        });
+        _flash(text: "NOPE", icon: Icons.thumb_down, color: Colors.red);
+        await _saveDecision(card, SwipeDecision.nope);
+      } else if (direction == CardSwiperDirection.top) {
+        setState(() {
+          _glow = SwipeGlow.maybe;
+          _glowStrength = 1.0;
+        });
+        _flash(text: "MAYBE", icon: Icons.help, color: Colors.amber);
+        await _saveDecision(card, SwipeDecision.maybe);
+      } else {
+        return;
+      }
+
+      await Future<void>.delayed(const Duration(milliseconds: 220));
+      if (!mounted) return;
       setState(() {
         _glow = SwipeGlow.none;
         _glowStrength = 0.0;
       });
-    }
-
-    await Future<void>.delayed(const Duration(milliseconds: 220));
-    if (!mounted) return;
-
-    setState(() {
-      _glow = SwipeGlow.none;
-      _glowStrength = 0.0;
     });
   }
 
@@ -333,7 +329,6 @@ class _SwipePageState extends State<SwipePage> {
     context.go('/auth');
   }
 
-  // ✅ Platform selector dialog (refreshes games from backend)
   Future<void> _openPlatformFilter() async {
     if (_allPlatforms.isEmpty) {
       try {
@@ -357,16 +352,13 @@ class _SwipePageState extends State<SwipePage> {
     setState(() {
       _error = null;
       _selectedPlatforms = chosen;
-      _refreshing = true; // overlay spinner, swiper stays mounted
+      _refreshing = true;
     });
 
     await LocalStore.saveSelectedPlatforms(chosen.toList());
-
-    // ✅ refetch using current genre + new platforms
     await _refetchGames();
   }
 
-  // ✅ When genre changes, refetch from backend by genre (and current consoles)
   Future<void> _setGenreAndRefetch(String value) async {
     if (!mounted) return;
     setState(() {
@@ -379,10 +371,7 @@ class _SwipePageState extends State<SwipePage> {
 
   @override
   Widget build(BuildContext context) {
-    // ✅ NEW: show Steam success popup if needed
     _maybeShowSteamImportDialog();
-
-    final cards = _filteredCards;
 
     return Scaffold(
       appBar: AppBar(
@@ -396,7 +385,6 @@ class _SwipePageState extends State<SwipePage> {
           ],
         ),
         actions: [
-          // 🎮 platform filter button + badge
           Stack(
             children: [
               IconButton(
@@ -444,7 +432,7 @@ class _SwipePageState extends State<SwipePage> {
           children: [
             if (_loading)
               const Center(child: CircularProgressIndicator())
-            else if (_error != null && _allCards.isEmpty)
+            else if (_error != null && _deck.isEmpty)
               Center(
                 child: Padding(
                   padding: const EdgeInsets.all(16),
@@ -473,41 +461,63 @@ class _SwipePageState extends State<SwipePage> {
             else
               Padding(
                 padding: const EdgeInsets.all(16),
-                child: cards.isEmpty
+                child: _deck.isEmpty
                     ? Center(
                   child: Text(
                     _selectedPlatforms.isEmpty
-                        ? "No games to show for this genre.\nTry a different genre!"
-                        : "No games match your genre + console filter.\nTap 🎮 to change consoles.",
+                        ? "No games to show for this category.\nTry a different one!"
+                        : "No games match your category + console filter.\nTap 🎮 to change consoles.",
                     textAlign: TextAlign.center,
                   ),
                 )
                     : Listener(
+                  behavior: HitTestBehavior.translucent,
                   onPointerDown: _onPointerDown,
                   onPointerMove: _onPointerMove,
                   onPointerUp: _onPointerEnd,
                   onPointerCancel: _onPointerEnd,
                   child: CardSwiper(
-                    // ✅ NO external controller -> avoids disposed-controller crash
-                    cardsCount: cards.length,
-                    onSwipe: (previousIndex, currentIndex, direction) async {
+                    cardsCount: _deck.length,
+                    isLoop: false,
+
+                    //keeps onSwipe synchronous in 4.1.3
+                    onSwipe: (previousIndex, currentIndex, direction) {
                       if (!mounted) return false;
-                      if (previousIndex < 0 || previousIndex >= cards.length) {
+                      if (previousIndex < 0 || previousIndex >= _deck.length) {
                         return false;
                       }
-                      final card = cards[previousIndex];
-                      await _handleSwipe(card, direction);
-                      return mounted;
+
+                      //Ignores downward swipes
+                      if (direction == CardSwiperDirection.bottom) return false;
+
+                      final card = _deck[previousIndex];
+
+                      _commitSwipe(card, direction);
+
+                      //removes the card so the next one shows immediately
+                      setState(() {
+                        if (previousIndex >= 0 && previousIndex < _deck.length) {
+                          _deck.removeAt(previousIndex);
+                        }
+                      });
+                      //tell swiper to complete the swipe
+                      return true;
                     },
+
+                    onEnd: () {
+                      if (!mounted) return;
+                      setState(() => _refreshing = true);
+                      _refetchGames();
+                    },
+
                     cardBuilder: (context, index) {
-                      final c = cards[index];
+                      final c = _deck[index];
                       return GameCoverCard(card: c);
                     },
                   ),
                 ),
               ),
 
-            // ✅ flash
             if (_flashText != null && _flashIcon != null && _flashColor != null)
               Positioned(
                 top: 26,
@@ -540,7 +550,6 @@ class _SwipePageState extends State<SwipePage> {
                 ),
               ),
 
-            // ✅ overlay spinner while switching genre/consoles (CardSwiper stays mounted)
             if (_refreshing)
               const Positioned.fill(
                 child: IgnorePointer(
@@ -668,7 +677,6 @@ class _Bubble extends StatelessWidget {
   }
 }
 
-// ✅ Dialog widget (fixed height list, no Expanded)
 class _PlatformPickerDialog extends StatefulWidget {
   final List<String> allPlatforms;
   final Set<String> initiallySelected;
