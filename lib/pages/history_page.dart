@@ -1,12 +1,14 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
+
 import 'package:play_m8/pages/GamePage.dart';
 import '../storage/local_store.dart';
 import '../types/models.dart';
-import 'package:http/http.dart' as http;
 
-//New
-final _baseUrl= 'http://10.0.2.2:8000';
+enum HistoryView { swiped, imported }
+
+const String _baseUrl = 'http://10.0.2.2:8000';
 
 class HistoryPage extends StatefulWidget {
   const HistoryPage({super.key});
@@ -22,6 +24,8 @@ class _HistoryPageState extends State<HistoryPage> {
   List<Map<String, dynamic>> _steamGames = [];
   List<HistoryItem> _history = [];
 
+  HistoryView _view = HistoryView.swiped;
+
   @override
   void initState() {
     super.initState();
@@ -30,18 +34,14 @@ class _HistoryPageState extends State<HistoryPage> {
 
   Future<void> _load() async {
     try {
-      final steamRaw = await LocalStore.loadSteamGames(); // List<dynamic>
-      final history = await LocalStore.loadHistory(); // List<HistoryItem>
+      final steamRaw = await LocalStore.loadSteamGames();
+      final history = await LocalStore.loadHistory();
 
-      // Convert steam list items into Map<String, dynamic>
       final steam = <Map<String, dynamic>>[];
       for (final item in steamRaw) {
-        if (item is Map) {
-          steam.add(item.cast<String, dynamic>());
-        }
+        if (item is Map) steam.add(item.cast<String, dynamic>());
       }
 
-      // Sort by playtime_forever DESC (most played first)
       steam.sort((a, b) {
         final ap = (a['playtime_forever'] as int?) ?? 0;
         final bp = (b['playtime_forever'] as int?) ?? 0;
@@ -51,7 +51,7 @@ class _HistoryPageState extends State<HistoryPage> {
       if (!mounted) return;
       setState(() {
         _steamGames = steam;
-        _history = history.reversed.toList(); // newest first
+        _history = history.reversed.toList();
         _loading = false;
         _error = null;
       });
@@ -75,18 +75,18 @@ class _HistoryPageState extends State<HistoryPage> {
 
     if (_error != null) {
       return Scaffold(
-        appBar: AppBar(title: const Text('History')),
+        appBar: AppBar(title: Text('History')),
         body: Center(
           child: Padding(
             padding: const EdgeInsets.all(16),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                const Text('Could not load history.'),
+                Text('Could not load history.'),
                 const SizedBox(height: 10),
                 Text(_error!, textAlign: TextAlign.center),
                 const SizedBox(height: 14),
-                FilledButton(onPressed: _load, child: const Text('Retry')),
+                FilledButton(onPressed: _load, child: Text('Retry')),
               ],
             ),
           ),
@@ -94,101 +94,161 @@ class _HistoryPageState extends State<HistoryPage> {
       );
     }
 
-    final showSteam = _steamGames.isNotEmpty;
-    final showHistory = _history.isNotEmpty;
+    final hasSteam = _steamGames.isNotEmpty;
+    final hasSwiped = _history.isNotEmpty;
 
     return Scaffold(
-      appBar: AppBar(title: const Text('History')),
-      body: (!showSteam && !showHistory)
-          ? const Center(child: Text('Nothing here yet. Swipe some games!'))
-          : CustomScrollView(
-        slivers: [
-          if (showSteam) ...[
-            const SliverToBoxAdapter(
-              child: Padding(
-                padding: EdgeInsets.fromLTRB(16, 16, 16, 10),
-                child: Text(
-                  'Most Played on Steam',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
+      appBar: AppBar(title: Text('History')),
+      body: Column(
+        children: [
+          const SizedBox(height: 12),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: SegmentedButton<HistoryView>(
+              segments: const [
+                ButtonSegment(
+                  value: HistoryView.swiped,
+                  label: Text('Swiped'),
+                  icon: Icon(Icons.swipe),
                 ),
-              ),
+                ButtonSegment(
+                  value: HistoryView.imported,
+                  label: Text('Imported'),
+                  icon: Icon(Icons.videogame_asset),
+                ),
+              ],
+              selected: {_view},
+              onSelectionChanged: (set) {
+                setState(() => _view = set.first);
+              },
             ),
-            SliverPadding(
-              padding: const EdgeInsets.symmetric(horizontal: 12),
-              sliver: SliverGrid(
-                delegate: SliverChildBuilderDelegate(
-                      (context, index) {
-                    final g = _steamGames[index];
-                    return SteamGameTile(game: g);
-                  },
-                  childCount: _steamGames.length,
-                ),
-                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                  crossAxisCount: 2,
-                  mainAxisSpacing: 12,
-                  crossAxisSpacing: 12,
-                  childAspectRatio: 1.55,
-                ),
-              ),
-            ),
-            const SliverToBoxAdapter(child: SizedBox(height: 18)),
-          ],
-          if (showHistory) ...[
-            const SliverToBoxAdapter(
-              child: Padding(
-                padding: EdgeInsets.fromLTRB(16, 6, 16, 10),
-                child: Text(
-                  'Swiped Games',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
-                ),
-              ),
-            ),
-            SliverPadding(
-              padding: const EdgeInsets.fromLTRB(12, 0, 12, 18),
-              sliver: SliverGrid(
-                delegate: SliverChildBuilderDelegate(
-                      (context, index) {
-                    final item = _history[index];
-                    return SwipedGameTile(item: item);
-                  },
-                  childCount: _history.length,
-                ),
-                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                  crossAxisCount: 2,
-                  mainAxisSpacing: 12,
-                  crossAxisSpacing: 12,
-                  childAspectRatio: 0.78,
-                ),
-              ),
-            ),
-          ],
+          ),
+          const SizedBox(height: 12),
+          const Divider(height: 1),
+          Expanded(
+            child: _view == HistoryView.swiped
+                ? _buildSwiped(hasSwiped)
+                : _buildImported(hasSteam),
+          ),
         ],
       ),
     );
   }
+
+  Widget _buildSwiped(bool hasSwiped) {
+    if (!hasSwiped) {
+      return Center(
+        child: Text('No swiped games yet.\nGo discover some games!'),
+      );
+    }
+
+    return CustomScrollView(
+      slivers: [
+        const SliverToBoxAdapter(
+          child: Padding(
+            padding: EdgeInsets.fromLTRB(16, 16, 16, 10),
+            child: Text(
+              'Swiped Games',
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
+            ),
+          ),
+        ),
+        SliverPadding(
+          padding: const EdgeInsets.fromLTRB(12, 0, 12, 18),
+          sliver: SliverGrid(
+            delegate: SliverChildBuilderDelegate(
+                  (context, index) {
+                final item = _history[index];
+                return SwipedGameTile(item: item);
+              },
+              childCount: _history.length,
+            ),
+            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: 2,
+              mainAxisSpacing: 12,
+              crossAxisSpacing: 12,
+              childAspectRatio: 0.78,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildImported(bool hasSteam) {
+    if (!hasSteam) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(18),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.videogame_asset_off, size: 48),
+              const SizedBox(height: 10),
+              Text(
+                "No imported Steam games yet.\nTry linking your Steam account to see them here!",
+                textAlign: TextAlign.center,
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    return CustomScrollView(
+      slivers: [
+        const SliverToBoxAdapter(
+          child: Padding(
+            padding: EdgeInsets.fromLTRB(16, 16, 16, 10),
+            child: Text(
+              'Most Played on Steam',
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
+            ),
+          ),
+        ),
+        SliverPadding(
+          padding: const EdgeInsets.symmetric(horizontal: 12),
+          sliver: SliverGrid(
+            delegate: SliverChildBuilderDelegate(
+                  (context, index) {
+                final g = _steamGames[index];
+                return SteamGameTile(game: g);
+              },
+              childCount: _steamGames.length,
+            ),
+            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: 2,
+              mainAxisSpacing: 12,
+              crossAxisSpacing: 12,
+              childAspectRatio: 1.55,
+            ),
+          ),
+        ),
+        const SliverToBoxAdapter(child: SizedBox(height: 18)),
+      ],
+    );
+  }
 }
 
-//New
-Future<String> getVideo(String gameName) async{
-  final url= Uri.parse('$_baseUrl/steam/vids?gameName=$gameName');
-  final response= await http.get(url).timeout(const Duration(seconds: 25));
+// -------------------
+// teammate feature: fetch video link for Steam game
+// -------------------
+Future<String> getVideo(String gameName) async {
+  final url = Uri.parse('$_baseUrl/steam/vids?gameName=$gameName');
+  final response = await http.get(url).timeout(const Duration(seconds: 25));
   if (response.statusCode != 200) {
-    throw Exception('Steam login_url failed: ${response.body}');
+    throw Exception('Steam vids failed: ${response.body}');
   }
-  final data= jsonDecode(response.body) as Map <String, dynamic>;
-  if (data.containsKey("HLS")) {
-    print(data["HLS"]);
-    return data["HLS"] as String;
-  }
-  else if (data.containsKey("MP4")){
-    print(data["MP4"]);
-    return data["MP4"] as String;
-  }
-  else{
-    print(data["Error"]);
-    return data["Error"] as String;
-  }
+
+  final data = jsonDecode(response.body) as Map<String, dynamic>;
+  if (data.containsKey("HLS")) return data["HLS"] as String;
+  if (data.containsKey("MP4")) return data["MP4"] as String;
+  return (data["Error"] ?? "Unknown error").toString();
 }
+
+// -------------------
+// Tiles
+// -------------------
 
 class SteamGameTile extends StatelessWidget {
   final Map<String, dynamic> game;
@@ -200,20 +260,24 @@ class SteamGameTile extends StatelessWidget {
     final header = (game['header_image'] ?? '') as String;
     final minutes = (game['playtime_forever'] as int?) ?? 0;
     final hours = (minutes / 60).toStringAsFixed(1);
-    String link;//New
-    
-    //New 
+
     return ClipRRect(
       borderRadius: BorderRadius.circular(14),
       child: Material(
         child: InkWell(
           onTap: () async {
-            link=await getVideo(name);
-            if(link.startsWith("https")) {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => Gamepage(videoUrl: link,gameName: name)),
-              );
+            try {
+              final link = await getVideo(name);
+              if (link.startsWith("https")) {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => Gamepage(videoUrl: link, gameName: name),
+                  ),
+                );
+              }
+            } catch (_) {
+              // optional: show snack bar
             }
           },
           child: Stack(
