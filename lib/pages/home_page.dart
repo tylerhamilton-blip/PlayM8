@@ -4,6 +4,8 @@ import '../storage/local_store.dart';
 import 'package:http/http.dart' as http;
 import './genre_questionnaire_page.dart';
 import './auth_page.dart';
+import './history_page.dart';
+import './swipe_page.dart';
 
 class HomePage extends StatefulWidget {
   final String username;
@@ -42,6 +44,41 @@ class _HomePageState extends State<HomePage>{
       _loading = false;
     });
     }
+
+  Future<void> history() async {
+    setState(() {
+      _loading = true;
+    });
+    await Future<void>.delayed(const Duration(milliseconds: 400));
+
+    if (!mounted) return;
+    // Navigate to genres page(very important section for page switching)
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+          builder: (_) => const HistoryPage()),
+    );
+    setState(() {
+      _loading = false;
+    });
+  }
+  Future<void> gameBrowse() async {
+    setState(() {
+      _loading = true;
+    });
+    await Future<void>.delayed(const Duration(milliseconds: 400));
+
+    if (!mounted) return;
+    // Navigate to genres page(very important section for page switching)
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+          builder: (_) => const SwipePage()),
+    );
+    setState(() {
+      _loading = false;
+    });
+  }
   Future<void> authPage() async {
     setState(() {
       _loading = true;
@@ -131,8 +168,8 @@ class _HomePageState extends State<HomePage>{
                   mainAxisSpacing: 12,
                   children: [
                     buildCard(Icons.category, "Genres", context,browseGenre),
-                    buildCard(Icons.person, "Browse", context,browseGenre),
-                    buildCard(Icons.menu_book_rounded, "Library", context,browseGenre),
+                    buildCard(Icons.person, "Browse", context,gameBrowse),
+                    buildCard(Icons.menu_book_rounded, "Library", context,history),
                     buildCard(Icons.settings, "Settings", context,browseGenre),
 
                   ],
