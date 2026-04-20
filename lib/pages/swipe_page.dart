@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_card_swiper/flutter_card_swiper.dart';
 import 'package:go_router/go_router.dart';
+import './auth_page.dart';
 
 import '../storage/local_store.dart';
 import '../types/models.dart';
@@ -233,7 +234,7 @@ class _SwipePageState extends State<SwipePage> {
 
     final dist = ax > ay ? ax : ay;
     final nextStrength = (dist / 180.0).clamp(0.0, 1.0);
-    
+
     final changed =
         nextGlow != _glow || (nextStrength - _glowStrength).abs() > 0.02;
     if (!changed) return;
