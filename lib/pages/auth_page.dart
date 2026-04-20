@@ -2,10 +2,10 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:url_launcher/url_launcher.dart';
-
 import '../storage/local_store.dart';
 import './home_page.dart';
 import './sign_up.dart';
+import 'package:go_router/go_router.dart';
 
 class AuthPage extends StatefulWidget {
   const AuthPage({super.key});
@@ -35,14 +35,12 @@ class _AuthPageState extends State<AuthPage> {
     await LocalStore.setLoggedIn(true);
 
     if (!mounted) return;
-    Navigator.push(
-      context,
-      MaterialPageRoute(builder: (_) => const SignupPage()),
-    );
+    context.push('/signup');
 
     setState(() => _loading = false);
   }
 
+  //New
   Future<void> _mockSignIn() async {
     setState(() {
       _loading = true;
@@ -55,7 +53,7 @@ class _AuthPageState extends State<AuthPage> {
         "password": _password.text,
         "username": "", // backend model includes it; safe to send empty
       };
-
+      late final steamId;
       final response = await http
           .post(
             Uri.parse(_loginUrl),
@@ -73,14 +71,29 @@ class _AuthPageState extends State<AuthPage> {
 
       final data = jsonDecode(response.body) as Map<String, dynamic>;
       final username = (data["username"] ?? "").toString();
-
+      //Gets the steam id from the user
+      if(data["openID"]!=null) {
+        steamId = (data['openID']["data"][0]['openID'] ?? '').toString();
+        await fetchAndSaveSteamGames(steamId);
+      }
       await LocalStore.setLoggedIn(true);
 
       if (!mounted) return;
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (_) => HomePage(username: username)),
-      );
+
+      //Checks to see if the user has a linked steam account
+      if(data["openID"]!=null)
+        {
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(builder: (_) => HomePage(username: username,steamID: steamId,)),
+          );
+        }
+      else {
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(builder: (_) => HomePage(username: username)),
+        );
+      }
     } catch (e) {
       if (!mounted) return;
       setState(() {
@@ -91,7 +104,25 @@ class _AuthPageState extends State<AuthPage> {
       setState(() => _loading = false);
     }
   }
+  //Fetch and save Steam owned games so HistoryPage can show them
+  Future<void> fetchAndSaveSteamGames(String steamid) async {
+    final uri = Uri.parse('$_baseUrl/steam/owned_games')
+        .replace(queryParameters: {"steamid": steamid});
+    final resp = await http.get(uri).timeout(const Duration(seconds: 30));
+    if (resp.statusCode != 200) {
+      throw Exception('Steam games backend error ${resp.statusCode}: ${resp.body}');
+    }
 
+    final decoded = jsonDecode(resp.body);
+
+    // backend returns: {steamid, game_count, games:[{appid,name,playtime_forever,header_image},...]}
+    if (decoded is Map && decoded['games'] is List) {
+      await LocalStore.saveSteamGames(decoded['games'] as List);
+    } else {
+      // if backend ever changes shape, fail safely
+      await LocalStore.saveSteamGames(const []);
+    }
+  }
   //Steam login -> deep link -> main.dart routes to /swipe
   Future<void> _steamLogin() async {
     setState(() {
