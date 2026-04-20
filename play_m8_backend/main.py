@@ -69,25 +69,14 @@ def signup(newAC: pyAccount):
 def login(account: pyAccount):
     """
     Expects Account.signIn(email, password) to return a User-like object
-    with getUsername(). This matches your teammate's code.
+    with getUsername().
     """
     email = account.email
     password = account.password
-
     user = ac.signIn(email, password)
-
-    # Defensive: if user is dict-like or doesn't have getUsername
-    username = None
-    if hasattr(user, "getUsername"):
-        username = user.getUsername()
-    elif isinstance(user, dict):
-        username = user.get("username")
-
-    if not username:
-        # You can change this behavior if you want
-        return {"username": ""}
-
-    return {"username": username}
+    username = user.getUsername()
+    openID= supabase.table("User_Platform").select("openID").eq("user_id",user.getUserId).execute()
+    return {"username": username,"openID":openID}
 
 
 # ==========================================================
