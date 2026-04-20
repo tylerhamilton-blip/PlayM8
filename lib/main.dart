@@ -6,12 +6,13 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:http/http.dart' as http;
-
+import 'pages/sign_up.dart';
 import 'pages/splash_page.dart';
 import 'pages/auth_page.dart';
 import 'pages/genre_questionnaire_page.dart';
 import 'pages/swipe_page.dart';
 import 'pages/history_page.dart';
+
 import 'storage/local_store.dart';
 import 'services/igdb_service.dart';//for Steam -> IGDB taste categories
 
@@ -51,6 +52,7 @@ class _PlayM8AppState extends State<PlayM8App> {
         GoRoute(path: '/genres', builder: (_, __) => const GenreQuestionnairePage()),
         GoRoute(path: '/swipe', builder: (_, __) => const SwipePage()),
         GoRoute(path: '/history', builder: (_, __) => const HistoryPage()),
+        GoRoute(path: '/signup', builder: (_,__) => const SignupPage()),
       ],
     );
 
