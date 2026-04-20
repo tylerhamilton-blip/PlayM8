@@ -35,7 +35,7 @@ class _GenreQuestionnairePageState extends State<GenreQuestionnairePage> {
     // Keep using the same storage method/key so the rest of your app stays compatible.
     await LocalStore.saveSelectedGenres(_selected.toList()..sort());
     if (!mounted) return;
-    context.go('/swipe');
+    context.push('/swipe');
   }
 
   @override
