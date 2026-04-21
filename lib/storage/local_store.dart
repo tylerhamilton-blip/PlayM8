@@ -68,6 +68,7 @@ class LocalStore {
     await _box.put('selected_platforms', platforms);
   }
 
+
   static Future<List<String>> loadSelectedPlatforms() async {
     final v = _box.get('selected_platforms');
     if (v is List) return v.cast<String>();
@@ -86,9 +87,30 @@ class LocalStore {
     await _box.put('history', raw);
   }
 
+
   static Future<List<HistoryItem>> loadHistory() async {
     final List<String> raw = (_box.get('history') as List?)?.cast<String>() ?? [];
     return raw.map((s) => HistoryItem.fromJson(jsonDecode(s))).toList();
+  }
+
+  // --- Used for storing the username of a user ---
+  static Future<void> saveUsername(String username) async {
+    await _box.put('username', username);
+  }
+
+  static Future<String?> loadUsername() async {
+    final v = _box.get('username');
+    return v is String ? v : null;
+  }
+
+  // --- Used for storing the userID of a user ---
+  static Future<void> saveUserID(String userid) async {
+    await _box.put('userid', userid);
+  }
+
+  static Future<String?> loadUserID() async {
+    final v = _box.get('userid');
+    return v is String ? v : null;
   }
 
   // --- Utility reset for testing ---
@@ -98,6 +120,7 @@ class LocalStore {
     await _box.delete('steam_id');
     await _box.delete('steam_games');
     await _box.delete('selected_platforms');
+    await _box.delete('userid');
     await _box.put('logged_in', false);
   }
 }
