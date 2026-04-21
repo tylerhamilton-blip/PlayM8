@@ -8,6 +8,7 @@ import './auth_page.dart';
 import '../storage/local_store.dart';
 import '../types/models.dart';
 import '../services/igdb_service.dart';
+import 'home_page.dart';
 
 class SwipePage extends StatefulWidget {
   const SwipePage({super.key});
@@ -369,7 +370,10 @@ class _SwipePageState extends State<SwipePage> {
     });
     await _refetchGames();
   }
-
+  Future<void> _goHome() async
+  {;
+    context.go('/home');
+  }
   @override
   Widget build(BuildContext context) {
     _maybeShowSteamImportDialog();
@@ -420,10 +424,15 @@ class _SwipePageState extends State<SwipePage> {
             icon: const Icon(Icons.grid_view),
           ),
           IconButton(
+            onPressed: ()=> _goHome(),
+            icon:const Icon(Icons.house),
+          ),
+          IconButton(
             onPressed: _resetEverything,
             icon: const Icon(Icons.logout),
             tooltip: 'Reset (mock logout)',
           ),
+
         ],
       ),
       body: AnimatedContainer(
