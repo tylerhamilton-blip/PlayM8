@@ -77,7 +77,7 @@ class _AuthPageState extends State<AuthPage> {
       await LocalStore.setLoggedIn(true);
 
       //Gets the steam id from the user
-      if(data["openID"]["openID"]!=null) {
+      if(data["openID"]!=null) {
         String steamId = (data['openID']["data"][0]['openID'] ?? '').toString();
         await fetchAndSaveSteamGames(steamId);
 
