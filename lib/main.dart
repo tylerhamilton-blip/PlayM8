@@ -6,13 +6,14 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:http/http.dart' as http;
-import 'pages/sign_up.dart';
+
 import 'pages/splash_page.dart';
+import 'pages/home_page.dart';
 import 'pages/auth_page.dart';
 import 'pages/genre_questionnaire_page.dart';
 import 'pages/swipe_page.dart';
 import 'pages/history_page.dart';
-
+import 'pages/sign_up.dart';
 import 'storage/local_store.dart';
 import 'services/igdb_service.dart';//for Steam -> IGDB taste categories
 
@@ -53,6 +54,7 @@ class _PlayM8AppState extends State<PlayM8App> {
         GoRoute(path: '/swipe', builder: (_, __) => const SwipePage()),
         GoRoute(path: '/history', builder: (_, __) => const HistoryPage()),
         GoRoute(path: '/signup', builder: (_,__) => const SignupPage()),
+        GoRoute(path: '/home', builder: (_,__) => const HomePage()),
       ],
     );
 
@@ -118,16 +120,41 @@ class _PlayM8AppState extends State<PlayM8App> {
     return imported;
   }
 
+  Future<void> _linkSteam(String steamId, String userId)async{
+    final resp= await http.post(
+      Uri.parse('$_baseUrl/steam/link'),
+        headers: {"Content-Type": "application/json"},
+        body: jsonEncode(
+            { "steamid": steamId,
+              "userid": userId,
+            }
+        ),
+    ).timeout(const Duration(seconds: 30),);
+
+    if (resp.statusCode != 200) {
+      throw Exception('Steam was unable to link ${resp.statusCode}: ${resp.body}');
+    }
+    final decoded = jsonDecode(resp.body) as Map<String,dynamic>;
+    print(decoded);
+  }
+
   Future<void> _handleDeepLink(Uri uri) async {
     //Expected from backend callback:
     //playm8://auth/steam?steamid=7656119...
     if (uri.scheme == 'playm8' && uri.host == 'auth' && uri.path == '/steam') {
       final steamid = uri.queryParameters['steamid'];
+      final currentId= await LocalStore.loadSteamId();
       if (steamid == null || steamid.isEmpty) return;
-
       try {
         //Save steamid + mark logged in
-        await LocalStore.saveSteamId(steamid);
+        if(currentId==null || currentId.isEmpty) {
+          print("Hello");
+          await LocalStore.saveSteamId(steamid);
+          final userId=await LocalStore.loadUserID();
+          if(userId==null) return;
+          await _linkSteam(steamid,userId);
+        }
+
         await LocalStore.setLoggedIn(true);
 
         //Prevent mixing users on shared devices
@@ -141,7 +168,7 @@ class _PlayM8AppState extends State<PlayM8App> {
         final importedGenres = await _fetchAndSaveSteamTasteGenres(steamid);
 
         //Navigate into the app and pass popup data to SwipePage
-        _router.go('/swipe', extra: {
+       _router.go('/swipe', extra: {
           'steamLinked': true,
           'importedGenres': importedGenres,
         });
