@@ -79,7 +79,7 @@ class _AuthPageState extends State<AuthPage> {
       final check=data["openID"]["data"];
       
       //Gets the steam id from the user
-      if(check.isEmpty==false) {
+      if(check.isEmpty==false && check[0]['openID'] != null)  {
         String steamId = (data['openID']["data"][0]['openID'] ?? '').toString();
         await fetchAndSaveSteamGames(steamId);
 
