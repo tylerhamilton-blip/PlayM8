@@ -71,29 +71,22 @@ class _AuthPageState extends State<AuthPage> {
 
       final data = jsonDecode(response.body) as Map<String, dynamic>;
       final username = (data["username"] ?? "").toString();
-      //Gets the steam id from the user
-      if(data["openID"]!=null) {
-        steamId = (data['openID']["data"][0]['openID'] ?? '').toString();
-        await fetchAndSaveSteamGames(steamId);
-      }
+      final userId=(data["uuid"]?? "").toString();
+      await LocalStore.saveUsername(username);
+      await LocalStore.saveUserID(userId);
       await LocalStore.setLoggedIn(true);
 
-      if (!mounted) return;
+      //Gets the steam id from the user
+      if(data["openID"]["openID"]!=null) {
+        String steamId = (data['openID']["data"][0]['openID'] ?? '').toString();
+        await fetchAndSaveSteamGames(steamId);
 
-      //Checks to see if the user has a linked steam account
-      if(data["openID"]!=null)
-        {
-          Navigator.pushReplacement(
-            context,
-            MaterialPageRoute(builder: (_) => HomePage(username: username,steamID: steamId,)),
-          );
-        }
-      else {
-          Navigator.pushReplacement(
-            context,
-            MaterialPageRoute(builder: (_) => HomePage(username: username)),
-        );
+        await LocalStore.saveSteamId(steamId);
       }
+
+      if (!mounted) return;
+      context.go('/home');
+
     } catch (e) {
       if (!mounted) return;
       setState(() {
