@@ -4,7 +4,6 @@ import urllib.parse
 import requests
 import re
 from typing import Dict, Any, List, Optional, Tuple
-
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse
@@ -29,6 +28,10 @@ class pyAccount(BaseModel):
     email: str
     password: str
     username: str
+
+class SteamLinkRequest(BaseModel):
+    steamid:str
+    userid: str
 
 
 ac = Account()
@@ -67,16 +70,12 @@ def signup(newAC: pyAccount):
 
 @app.post("/login")
 def login(account: pyAccount):
-    """
-    Expects Account.signIn(email, password) to return a User-like object
-    with getUsername().
-    """
     email = account.email
     password = account.password
     user = ac.signIn(email, password)
     username = user.getUsername()
     openID= supabase.table("User_Platform").select("openID").eq("user_id",user.getUserId).execute()
-    return {"username": username,"openID":openID}
+    return {"username": username,"openID":openID, "email":email,"uuid": user.getUserId}
 
 
 # ==========================================================
@@ -93,6 +92,14 @@ def build_steam_login_url() -> str:
         "openid.claimed_id": "http://specs.openid.net/auth/2.0/identifier_select",
     }
     return f"{STEAM_OPENID_ENDPOINT}?{urllib.parse.urlencode(params)}"
+
+#New
+#Allows for account linking
+@app.post("/steam/link")
+def steam_link(steamInfo: SteamLinkRequest):
+    print("Hello");
+    supabase.table("User_Platform").update({"openID":int(steamInfo.steamid)}).eq("user_id",steamInfo.userid).execute()
+    return {"message":"success"}
 
 
 def extract_steamid(claimed_id: str) -> str:
@@ -216,6 +223,8 @@ def steam_video(gameName:str):
     #Used to get the id of from a game name
     url=f"https://store.steampowered.com/api/storesearch/?term={gameName}&l=english&cc=US"
     response= requests.get(url).json()
+    if not response['items']:
+        return {"Error": "No video available for game"}
     #Getting the necessary ID
     id=response["items"][0]["id"]
     #Getting the trailer set in steam for the game
@@ -280,6 +289,7 @@ def _clean_title_for_igdb(name: str) -> str:
         s,
         flags=re.I,
     )
+
     s = re.sub(r"\s+", " ", s).strip()
     return s
 
@@ -292,9 +302,8 @@ def _igdb_best_match_categories(game_name: str) -> Tuple[List[str], List[str]]:
     token = get_twitch_token()
     headers = {"Client-ID": TWITCH_CLIENT_ID, "Authorization": f"Bearer {token}"}
 
-    search=q.replace('"', '\\"')
     query = f'''
-      search "{search}";
+      search "{q.replace('"', '\\"')}";
       fields id, name, genres.name, themes.name, rating_count;
       where name != null;
       limit 5;
@@ -566,3 +575,4 @@ def igdb_platforms(limit: int = 250):
     _platforms_cache["data"] = names
     _platforms_cache["expires_at"] = now + (24 * 60 * 60)
     return names
+
