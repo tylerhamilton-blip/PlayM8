@@ -1,24 +1,25 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../storage/local_store.dart';
 import 'package:http/http.dart' as http;
 import './genre_questionnaire_page.dart';
-import './auth_page.dart';
+import '../pages/auth_page.dart';
 import './history_page.dart';
 import './swipe_page.dart';
 import 'package:play_m8/storage/local_store.dart';
+import 'dart:async';
 
 class HomePage extends StatefulWidget {
-  final String username;
-  final String? steamID;
-  const HomePage({Key? key, required this.username,this.steamID}) : super(key: key);
-
+  const HomePage({super.key});
   @override
   State<HomePage> createState() => _HomePageState();
 }
 class _HomePageState extends State<HomePage>{
   //Add a get method here to implement custom user profiles later
-  late String userName;
+  String? username;
   bool _loading = false;
 
   //Used to initialized the variables/ attributes above(userName)
@@ -26,7 +27,15 @@ class _HomePageState extends State<HomePage>{
   void initState()
   {
     super.initState();
-    userName=widget.username;//Using the username from the constructor to initialize
+    _loadUsername();//Using the username from the constructor to initialize
+  }
+  //Loads username into the page
+  Future<void> _loadUsername() async{
+    final userName= await LocalStore.loadUsername();
+    setState((){
+      username=userName!;
+    }
+    );
   }
 
   Future<void> browseGenre() async {
@@ -37,11 +46,7 @@ class _HomePageState extends State<HomePage>{
 
     if (!mounted) return;
     // Navigate to genres page(very important section for page switching)
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-          builder: (_) => const GenreQuestionnairePage()),
-    );
+    context.push('/genres');
     setState(() {
       _loading = false;
     });
@@ -60,6 +65,7 @@ class _HomePageState extends State<HomePage>{
       context,
       MaterialPageRoute(
           builder: (_) => const HistoryPage()),
+
     );
     setState(() {
       _loading = false;
@@ -84,17 +90,59 @@ class _HomePageState extends State<HomePage>{
       _loading = true;
     });
     await Future<void>.delayed(const Duration(milliseconds: 400));
+    await LocalStore.resetAll();
 
     if (!mounted) return;
     // Navigate to genres page(very important section for page switching)
-    Navigator.pushReplacement(
-      context,
-      MaterialPageRoute(
-          builder: (_) => const AuthPage()),
-    );
+    context.go('/auth');
     setState(() {
       _loading = false;
     });
+  }
+
+  //Steam login -> deep link -> main.dart routes to /swipe
+  Future<void> steamLogin() async {
+    setState(() {
+      _loading = true;
+      String? _error=null;
+    });
+
+    try {
+      final uri = Uri.parse('http://10.0.2.2:8000/steam/login_url');
+      final resp = await http.get(uri).timeout(const Duration(seconds: 20));
+
+      if (resp.statusCode != 200) {
+        throw Exception('Backend ${resp.statusCode}: ${resp.body}');
+      }
+
+      final data = jsonDecode(resp.body) as Map<String, dynamic>;
+      final url = (data['url'] ?? '').toString();
+
+      if (url.isEmpty) {
+        throw Exception('Backend did not return a login url.');
+      }
+
+      final steamUri = Uri.parse(url);
+
+      final ok = await launchUrl(
+        steamUri,
+        mode: LaunchMode.externalApplication,
+      );
+
+      if (!ok) {
+        throw Exception('Could not open Steam login URL.');
+      }
+
+      //Steam callback deep-links into app -> main.dart handles it -> /swipe
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        var _error = 'Steam login failed: $e';
+      });
+    } finally {
+      if (!mounted) return;
+      setState(() => _loading = false);
+    }
   }
 
   @override
@@ -117,10 +165,7 @@ class _HomePageState extends State<HomePage>{
           IconButton(
             icon: Icon(Icons.logout,
                 color: Colors.white),
-            onPressed: () async {
-              await LocalStore.resetAll();
-              authPage();
-            },
+            onPressed: () => authPage(),
           ),
         ],
       ),
@@ -137,7 +182,7 @@ class _HomePageState extends State<HomePage>{
                   browseGenre();
                 },
                 icon: Icon(Icons.category,color: Colors.white),
-                label: Text("Hello $userName lets browse!!!"),
+                label: Text("Hello $username lets browse!!!"),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: Colors.redAccent,
                   foregroundColor: Colors.black,
@@ -171,7 +216,7 @@ class _HomePageState extends State<HomePage>{
                   buildCard(Icons.category, "Genres", context,browseGenre),
                   buildCard(Icons.person, "Browse", context,gameBrowse),
                   buildCard(Icons.menu_book_rounded, "Library", context,history),
-                  buildCard(Icons.settings, "Settings", context,browseGenre),
+                  buildCard(Icons.gamepad, "Link Account", context,steamLogin),
 
                 ],
               ),
