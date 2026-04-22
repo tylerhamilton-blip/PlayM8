@@ -28,6 +28,11 @@ class LocalStore {
   static Future<void> clearSteamId() async {
     await _box.delete('steam_id');
   }
+  
+  //Used to create the url for the api to use in other pages for API calls
+  static String demo(){
+      return "10.0.2.2";//Change with machine ip to use physical devices
+  }
 
   //Steam games list (raw JSON list so no Hive adapters needed)
   static Future<void> saveSteamGames(List<dynamic> games) async {
