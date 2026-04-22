@@ -36,7 +36,7 @@ class SteamLinkRequest(BaseModel):
 
 
 ac = Account()
-# 1. This function finds the ip of a device
+# This function finds the ip of a device
 def get_machine_ip():
     s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     s.connect(("8.8.8.8", 80)) # Doesn't actually send data
