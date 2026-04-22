@@ -17,7 +17,7 @@ class _SignupPageState extends State<SignupPage> {
   final TextEditingController _usernameController = TextEditingController();
 
   // Replace with your FastAPI endpoint
-  final String apiUrl = "http://10.0.2.2:8000/signup";
+  final String apiUrl = "http://${LocalStore.demo()}:8000/signup";
 
   Future<void> signup() async {
     final Map<String, dynamic> payload = {
