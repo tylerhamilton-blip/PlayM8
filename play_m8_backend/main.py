@@ -3,6 +3,7 @@ import time
 import urllib.parse
 import requests
 import re
+import socket
 from typing import Dict, Any, List, Optional, Tuple
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -35,7 +36,15 @@ class SteamLinkRequest(BaseModel):
 
 
 ac = Account()
+# 1. This function finds the ip of a device
+def get_machine_ip():
+    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    s.connect(("8.8.8.8", 80)) # Doesn't actually send data
+    local_ip = s.getsockname()[0]
+    s.close()
+    return local_ip
 
+ip=get_machine_ip()
 # -----------------------------
 # Env
 # -----------------------------
@@ -45,7 +54,8 @@ TWITCH_CLIENT_SECRET = os.getenv("TWITCH_CLIENT_SECRET", "")
 STEAM_WEB_API_KEY = os.getenv("STEAM_WEB_API_KEY", "")
 
 # Steam OpenID
-PUBLIC_BASE_URL = os.getenv("PUBLIC_BASE_URL", "http://10.0.2.2:8000")
+#os.getenv("PUBLIC_BASE_URL", f"http://10.0.2.2:8000")
+PUBLIC_BASE_URL = f"http://{ip}:8000"
 STEAM_OPENID_ENDPOINT = "https://steamcommunity.com/openid/login"
 
 # -----------------------------
@@ -63,6 +73,7 @@ app.add_middleware(
 # ==========================================================
 # Auth (Signup + Login)
 # ==========================================================
+
 @app.post("/signup")
 def signup(newAC: pyAccount):
     ac.createAccount(newAC.username, newAC.email, newAC.password)
@@ -82,6 +93,7 @@ def login(account: pyAccount):
 # Steam OpenID Login
 # ==========================================================
 def build_steam_login_url() -> str:
+    print(PUBLIC_BASE_URL)
     return_to = f"{PUBLIC_BASE_URL}/steam/callback"
     params = {
         "openid.ns": "http://specs.openid.net/auth/2.0",
@@ -97,7 +109,6 @@ def build_steam_login_url() -> str:
 #Allows for account linking
 @app.post("/steam/link")
 def steam_link(steamInfo: SteamLinkRequest):
-    print("Hello");
     supabase.table("User_Platform").update({"openID":int(steamInfo.steamid)}).eq("user_id",steamInfo.userid).execute()
     return {"message":"success"}
 
@@ -301,14 +312,14 @@ def _igdb_best_match_categories(game_name: str) -> Tuple[List[str], List[str]]:
 
     token = get_twitch_token()
     headers = {"Client-ID": TWITCH_CLIENT_ID, "Authorization": f"Bearer {token}"}
-
-    search=q.replace('"', '\\"')
+    search=q.replace('"','\\"')
     query = f'''
       search "{search}";
       fields id, name, genres.name, themes.name, rating_count;
       where name != null;
       limit 5;
     '''
+
     r = requests.post(
         "https://api.igdb.com/v4/games", headers=headers, data=query, timeout=20
     )
@@ -431,7 +442,7 @@ def steam_profile_categories(steamid: str, top_n: int = 25, top_k: int = 6):
 # ==========================================================
 @app.get("/igdb/games")
 def igdb_games(
-    limit: int = 40, genre: Optional[str] = None, platforms: Optional[str] = None
+        limit: int = 40, genre: Optional[str] = None, platforms: Optional[str] = None
 ):
     now = int(time.time())
     cache_key = f"limit={limit}|genre={genre or ''}|platforms={platforms or ''}"
@@ -575,4 +586,3 @@ def igdb_platforms(limit: int = 250):
     _platforms_cache["data"] = names
     _platforms_cache["expires_at"] = now + (24 * 60 * 60)
     return names
-
