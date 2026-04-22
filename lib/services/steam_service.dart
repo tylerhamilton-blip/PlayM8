@@ -1,9 +1,10 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import 'package:play_m8/storage/local_store.dart';
 
 class SteamService {
   // Android emulator -> host machine localhost is 10.0.2.2
-  static const String _baseUrl = 'http://10.0.2.2:8000';
+  static final String _baseUrl = 'http://${LocalStore.demo()}:8000';
 
   static Future<String> getLoginUrl() async {
     final uri = Uri.parse('$_baseUrl/steam/login_url');
