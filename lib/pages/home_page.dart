@@ -37,7 +37,6 @@ class _HomePageState extends State<HomePage>{
     }
     );
   }
-
   Future<void> browseGenre() async {
     setState(() {
       _loading = true;
@@ -51,7 +50,6 @@ class _HomePageState extends State<HomePage>{
       _loading = false;
     });
   }
-
 
   Future<void> history() async {
     setState(() {
@@ -108,7 +106,7 @@ class _HomePageState extends State<HomePage>{
     });
 
     try {
-      final uri = Uri.parse('http://10.0.2.2:8000/steam/login_url');
+      final uri = Uri.parse('http://${LocalStore.demo()}:8000/steam/login_url');
       final resp = await http.get(uri).timeout(const Duration(seconds: 20));
 
       if (resp.statusCode != 200) {
@@ -216,7 +214,7 @@ class _HomePageState extends State<HomePage>{
                   buildCard(Icons.category, "Genres", context,browseGenre),
                   buildCard(Icons.person, "Browse", context,gameBrowse),
                   buildCard(Icons.menu_book_rounded, "Library", context,history),
-                  buildCard(Icons.gamepad, "Link Account", context,steamLogin),
+                  buildCard(Icons.gamepad, "Link Steam", context,steamLogin),
 
                 ],
               ),
