@@ -139,7 +139,7 @@ h2 {
 }
 .team-member h3 {
     margin: 10px 0 5px 0;
-    color: white;
+    color: var(--primary);
     font-size: 1.2rem;
 }
 .team-links a {
