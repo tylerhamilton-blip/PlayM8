@@ -8,7 +8,7 @@ import '../types/models.dart';
 
 enum HistoryView { swiped, imported }
 
-const String _baseUrl = 'http://10.0.2.2:8000';
+final String _baseUrl = 'http://${LocalStore.demo()}:8000';
 
 class HistoryPage extends StatefulWidget {
   const HistoryPage({super.key});
@@ -353,77 +353,77 @@ class SwipedGameTile extends StatelessWidget {
     return ClipRRect(
       borderRadius: BorderRadius.circular(14),
       child: Material(
-          child: InkWell(
-              onTap: () async {
-                try {
-                  final link = await getVideo(card.title);
-                  if (link.startsWith("https")) {
-                    print(card.id);
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) =>
-                            Gamepage(videoUrl: link, gameName: card.title),
-                      ),
-                    );
-                  }
-                } catch (_) {
-                  // optional: show snack bar
-                }
-              },
-            child: Stack(
-              fit: StackFit.expand,
-              children: [
-                if ((card.imageUrl ?? '').isNotEmpty)
-                  Image.network(
-                    card.imageUrl!,
-                    fit: BoxFit.cover,
-                    errorBuilder: (_, __, ___) => const DecoratedBox(
-                      decoration: BoxDecoration(color: Colors.black12),
-                      child: Center(child: Icon(Icons.broken_image)),
-                    ),
-                  )
-                else
-                  const DecoratedBox(
+        child: InkWell(
+          onTap: () async {
+            try {
+              final link = await getVideo(card.title);
+              if (link.startsWith("https")) {
+                print(card.id);
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) =>
+                        Gamepage(videoUrl: link, gameName: card.title),
+                  ),
+                );
+              }
+            } catch (_) {
+              // optional: show snack bar
+            }
+          },
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              if ((card.imageUrl ?? '').isNotEmpty)
+                Image.network(
+                  card.imageUrl!,
+                  fit: BoxFit.cover,
+                  errorBuilder: (_, __, ___) => const DecoratedBox(
                     decoration: BoxDecoration(color: Colors.black12),
-                    child: Center(child: Icon(Icons.sports_esports)),
+                    child: Center(child: Icon(Icons.broken_image)),
                   ),
-                Align(
-                  alignment: Alignment.bottomCenter,
-                  child: Container(
-                    height: 80,
-                    decoration: const BoxDecoration(
-                      gradient: LinearGradient(
-                        begin: Alignment.topCenter,
-                        end: Alignment.bottomCenter,
-                        colors: [Colors.transparent, Color(0xCC000000)],
-                      ),
+                )
+              else
+                const DecoratedBox(
+                  decoration: BoxDecoration(color: Colors.black12),
+                  child: Center(child: Icon(Icons.sports_esports)),
+                ),
+              Align(
+                alignment: Alignment.bottomCenter,
+                child: Container(
+                  height: 80,
+                  decoration: const BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                      colors: [Colors.transparent, Color(0xCC000000)],
                     ),
                   ),
                 ),
-                Positioned(
-                  left: 10,
-                  right: 10,
-                  bottom: 10,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        card.title,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontWeight: FontWeight.w800,
-                        ),
+              ),
+              Positioned(
+                left: 10,
+                right: 10,
+                bottom: 10,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      card.title,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w800,
                       ),
-                      const SizedBox(height: 6),
-                      _DecisionPill(decision: item.decision),
-                    ],
-                  ),
+                    ),
+                    const SizedBox(height: 6),
+                    _DecisionPill(decision: item.decision),
+                  ],
                 ),
-              ],
-            ),
+              ),
+            ],
+          ),
         ),
       ),
     );

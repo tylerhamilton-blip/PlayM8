@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
+import 'package:play_m8/services/igdb_service.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../storage/local_store.dart';
 import './home_page.dart';
@@ -20,10 +21,9 @@ class _AuthPageState extends State<AuthPage> {
 
   bool _loading = false;
   String? _error;
-
-  static const String _baseUrl = 'http://10.0.2.2:8000';
-  static const String _loginUrl = '$_baseUrl/login';
-
+  static final String _baseUrl = 'http://${LocalStore.demo()}:8000';
+  static final String _loginUrl = '$_baseUrl/login';
+  
   // Sign up -> teammate’s flow
   Future<void> _mockSignUp() async {
     setState(() {
@@ -54,12 +54,13 @@ class _AuthPageState extends State<AuthPage> {
         "username": "", // backend model includes it; safe to send empty
       };
       late final steamId;
+      print('http://${await LocalStore.demo()}:8000');
       final response = await http
           .post(
-            Uri.parse(_loginUrl),
-            headers: {"Content-Type": "application/json"},
-            body: jsonEncode(payload),
-          )
+        Uri.parse(_loginUrl),
+        headers: {"Content-Type": "application/json"},
+        body: jsonEncode(payload),
+      )
           .timeout(const Duration(seconds: 20));
 
       if (response.statusCode != 200) {
@@ -75,11 +76,11 @@ class _AuthPageState extends State<AuthPage> {
       await LocalStore.saveUsername(username);
       await LocalStore.saveUserID(userId);
       await LocalStore.setLoggedIn(true);
-
+      final check=data["openID"]["data"];
       //Gets the steam id from the user
-      if(data["openID"]!=null) {
+      if(check.isEmpty==false && check[0]['openID'] != null) {
         String steamId = (data['openID']["data"][0]['openID'] ?? '').toString();
-        await fetchAndSaveSteamGames(steamId);
+        await fetchAndSaveSteamGames(steamId); //Problem
 
         await LocalStore.saveSteamId(steamId);
       }
@@ -202,10 +203,10 @@ class _AuthPageState extends State<AuthPage> {
                     onPressed: _loading ? null : _mockSignIn,
                     child: _loading
                         ? const SizedBox(
-                            height: 18,
-                            width: 18,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          )
+                      height: 18,
+                      width: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
                         : const Text('Login'),
                   ),
                 ),

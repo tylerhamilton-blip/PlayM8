@@ -45,9 +45,9 @@ class Account:
         supabase.table("users").insert({"userID": user, "username": username}).execute()
         library=self.addLibrary(user)
         supabase.table("users").update({"lib": library }).eq("userID",user).execute()
-        supabase.table("User_Platform").insert({"userID": user}).execute()
+        supabase.table("User_Platform").insert({"user_id": user,"platform_id": 1}).execute()
 
-#New changes from Xavion
+    #New changes from Xavion
     def signIn (self,email,password):
         from user import User
         #Throws an exception if there is no account to sign into

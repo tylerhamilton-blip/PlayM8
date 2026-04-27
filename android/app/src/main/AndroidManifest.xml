@@ -5,6 +5,7 @@
         android:usesCleartextTraffic="true"
         android:label="play_m8"
         android:name="${applicationName}"
+        android:enableOnBackInvokedCallback="true"
         android:icon="@mipmap/ic_launcher">
 
         <activity

@@ -5,7 +5,7 @@ import '../types/models.dart';
 import '../storage/local_store.dart'; //NEW: so we can save categories locally
 
 class IgdbService {
-  static const String _baseUrl = 'http://10.0.2.2:8000';
+  static final String _baseUrl = 'http://${LocalStore.demo()}:8000';
 
   static Future<List<GameCard>> fetchGames({
     int limit = 30,
