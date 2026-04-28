@@ -183,7 +183,13 @@ class _PlayM8AppState extends State<PlayM8App> {
       }
     }
   }
-
+  
+ //questionnaire
+  static Future<void> saveQuestionnaire(Map data) async {
+    final box = await Hive.openBox('user_data');
+    await box.put('questionnaire', data);
+  }
+  
   @override
   void dispose() {
     _sub?.cancel();
