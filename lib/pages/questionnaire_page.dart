@@ -31,7 +31,8 @@ class _QuestionnairePageState extends State<QuestionnairePage> {
   String budget = "";
   String hasSteam = "";
   String otherPlatformText = "";
-
+  String birthday="";
+  
   double storyImportance = 3;
   double replayability = 3;
 
