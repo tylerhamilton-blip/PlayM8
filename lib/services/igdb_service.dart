@@ -105,9 +105,9 @@ class IgdbService {
   }
 
   // ==========================================================
-  // NEW: convenience helper
-  // Call this once after Steam login (when you have steamid),
-  // and it will save categories as the app's selected genres.
+  //NEW: convenience helper
+  //Call this once after Steam login (when we have the steamid),
+  //and it will save categories as the app's selected genres.
   // ==========================================================
   static Future<List<String>> applySteamTasteToLocalGenres({
     required String steamid,
@@ -122,8 +122,8 @@ class IgdbService {
       topK: topK,
     );
 
-    // Option A: use the combined ranking list (best overall)
-    // Optionally filter out themes by only using top_genres if you want.
+    //How we use the combined ranking list (best overall)
+    //Optionally filter out themes by only using top_genres if we want.
     List<String> categories;
 
     if (includeThemes) {
@@ -142,7 +142,6 @@ class IgdbService {
       if (out.length >= maxToSave) break;
     }
 
-    //Save so your GenreQuestionnaire / Swipe dropdown uses it
     await LocalStore.saveSelectedGenres(out);
 
     return out;
