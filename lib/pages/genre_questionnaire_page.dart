@@ -14,8 +14,6 @@ class _GenreQuestionnairePageState extends State<GenreQuestionnairePage> {
   // NOTE:
   // These are "categories" (some are IGDB Genres, some are IGDB Themes).
   // Example: Horror is a Theme on IGDB, not a Genre.
-  //
-  // You can replace this later by fetching real genres/themes from your backend.
   final _allCategories = const [
     'Action',
     'Adventure',
@@ -26,8 +24,8 @@ class _GenreQuestionnairePageState extends State<GenreQuestionnairePage> {
     'Racing',
     'Sports',
     'Simulation',
-    'Horror', // Theme on IGDB
-    'Indie',  // Often shows up as Theme / tag in some datasets
+    'Horror', //Theme on IGDB
+    'Indie',  //Often shows up as a Theme
   ];
 
   final Set<String> _selected = {};
