@@ -12,7 +12,6 @@ class SplashPage extends StatefulWidget {
 }
 
 class _SplashPageState extends State<SplashPage> {
-  // Set this to true after you add: assets/animations/logo.json
   static const bool kUseLottie = false;
 
   @override
