@@ -231,7 +231,7 @@ class _HistoryPageState extends State<HistoryPage> {
 }
 
 // -------------------
-// teammate feature: fetch video link for Steam game
+// Fetch video link for Steam games
 // -------------------
 Future<String> getVideo(String gameName) async {
   final url = Uri.parse('$_baseUrl/steam/vids?gameName=$gameName');
@@ -277,7 +277,7 @@ class SteamGameTile extends StatelessWidget {
                 );
               }
             } catch (_) {
-              // optional: show snack bar
+              //optional: show snack bar
             }
           },
           child: Stack(
